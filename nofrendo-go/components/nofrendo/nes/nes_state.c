@@ -422,6 +422,10 @@ int nes_state_load(uint8_t* flash_ptr, size_t size)
    /* close file, we're done */
    // fclose(file);
 
+   // Force the first frame after a load to not be drawn.
+   // This prevents a potential hang issue after a load.
+   nes_getptr()->drawframe = false;
+
    MESSAGE_INFO("state_load: Game %d restored\n", save_slot);
 
    return 0;
