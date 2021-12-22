@@ -1,7 +1,11 @@
-// hard_pce.c - Memory/IO/Timer emulation
+// pce.c - Machine emulation (Memory/IO/Timer)
 //
-#include "hard_pce.h"
+#include <stdlib.h>
+#include <string.h>
+#include "pce-go.h"
+#include "utils.h"
 #include "pce.h"
+#include "gfx.h"
 
 // Global struct containing our emulated hardware status
 PCE_t PCE;
@@ -9,8 +13,8 @@ PCE_t PCE;
 // Memory Mapping
 uint8_t *PageR[8];
 uint8_t *PageW[8];
-uint8_t *MemoryMapR[256];
-uint8_t *MemoryMapW[256];
+
+static bool running = false;
 
 static inline void timer_run(void);
 
@@ -18,20 +22,21 @@ static inline void timer_run(void);
   * Reset the hardware
   **/
 void
-pce_reset(void)
+pce_reset(bool hard)
 {
-    memset(&PCE.RAM, 0, sizeof(PCE.RAM));
-    memset(&PCE.VRAM, 0, sizeof(PCE.VRAM));
-    memset(&PCE.SPRAM, 0, sizeof(PCE.SPRAM));
-    memset(&PCE.Palette, 0, sizeof(PCE.Palette));
     memset(&PCE.VCE, 0, sizeof(PCE.VCE));
     memset(&PCE.VDC, 0, sizeof(PCE.VDC));
     memset(&PCE.PSG, 0, sizeof(PCE.PSG));
     memset(&PCE.Timer, 0, sizeof(PCE.Timer));
 
+    if (hard) {
+        memset(&PCE.RAM, 0, sizeof(PCE.RAM));
+        memset(&PCE.VRAM, 0, sizeof(PCE.VRAM));
+        memset(&PCE.SPRAM, 0, sizeof(PCE.SPRAM));
+        memset(&PCE.Palette, 0, sizeof(PCE.Palette));
     memset(&PCE.NULLRAM, 0xFF, sizeof(PCE.NULLRAM));
+    }
 
-    PCE.irq_mask = PCE.irq_status = 0;
     PCE.SF2 = 0;
 
     Cycles = 0;
@@ -63,18 +68,28 @@ int
 pce_init(void)
 {
     for (int i = 0; i < 0xFF; i++) {
-        MemoryMapR[i] = PCE.NULLRAM;
-        MemoryMapW[i] = PCE.NULLRAM;
+        PCE.MemoryMapR[i] = PCE.NULLRAM;
+        PCE.MemoryMapW[i] = PCE.NULLRAM;
     }
 
-    MemoryMapR[0xF8] = PCE.RAM;
-    MemoryMapW[0xF8] = PCE.RAM;
-    MemoryMapR[0xFF] = PCE.IOAREA;
-    MemoryMapW[0xFF] = PCE.IOAREA;
+    PCE.MemoryMapR[0xF8] = PCE.RAM;
+    PCE.MemoryMapW[0xF8] = PCE.RAM;
+    PCE.MemoryMapR[0xFF] = PCE.IOAREA;
+    PCE.MemoryMapW[0xFF] = PCE.IOAREA;
 
     // pce_reset();
 
     return 0;
+}
+
+
+/**
+  * Terminate the emulation loop
+  **/
+void
+pce_pause(void)
+{
+    running = false;
 }
 
 
@@ -95,12 +110,12 @@ pce_term(void)
 void
 pce_run(void)
 {
-    host.paused = 0;
+    running = true;
 
-    while (!host.paused) {
-        osd_input_read();
+    while (running) {
+        osd_input_read(PCE.Joypad.regs);
 
-        for (Scanline = 0; Scanline < 263; ++Scanline) {
+        for (PCE.Scanline = 0; PCE.Scanline < 263; ++PCE.Scanline) {
             PCE.MaxCycles += CYCLES_PER_LINE;
             h6280_run();
             timer_run();
@@ -134,7 +149,7 @@ timer_run(void)
 			// Trigger when it underflows from 0
 			if (PCE.Timer.counter > 0x7F) {
 				PCE.Timer.counter = PCE.Timer.reload;
-				PCE.irq_status |= INT_TIMER;
+                CPU.irq_lines |= INT_TIMER;
 			}
 			PCE.Timer.counter--;
 		}
@@ -156,7 +171,7 @@ cart_write(uint16_t A, uint8_t V)
             uint8_t *base = PCE.ROM_DATA + PCE.SF2 * (512 * 1024);
             for (int i = 0x40; i < 0x80; i++)
             {
-                MemoryMapR[i] = base + i * 0x2000;
+                PCE.MemoryMapR[i] = base + i * 0x2000;
             }
             for (int i = 0; i < 8; i++)
             {
@@ -169,7 +184,7 @@ cart_write(uint16_t A, uint8_t V)
 
 
 IRAM_ATTR inline uint8_t
-IO_read(uint16_t A)
+pce_readIO(uint16_t A)
 {
     uint8_t ret = 0xFF; // Open Bus
 
@@ -250,11 +265,11 @@ IO_read(uint16_t A)
     case 0x1400:                /* IRQ */
         switch (A & 3) {
         case 2:
-            ret = PCE.irq_mask | (PCE.io_buffer & ~INT_MASK);
+            ret = CPU.irq_mask | (PCE.io_buffer & ~INT_MASK);
             break;
         case 3:
-            ret = PCE.irq_status;
-            PCE.irq_status = 0;
+            ret = CPU.irq_lines;
+            CPU.irq_lines = 0;
             break;
         }
         break;
@@ -280,7 +295,7 @@ IO_read(uint16_t A)
 
 
 IRAM_ATTR inline void
-IO_write(uint16_t A, uint8_t V)
+pce_writeIO(uint16_t A, uint8_t V)
 {
     TRACE_IO("IO Write %02x at %04x\n", V, A);
 
@@ -337,7 +352,7 @@ IO_write(uint16_t A, uint8_t V)
                    return;
                  */
                 gfx_latch_context(0);
-                ScrollYDiff = Scanline - 1 - IO_VDC_MINLINE;
+                PCE.ScrollYDiff = PCE.Scanline - 1 - IO_VDC_MINLINE;
                 break;
 
             case MWR:                           // Memory Width Register
@@ -389,7 +404,6 @@ IO_write(uint16_t A, uint8_t V)
                 // I am not 100% sure if MAWR should wrap instead, eg IO_VDC_REG[MAWR].W & 0x7FFF
                 if (IO_VDC_REG[MAWR].W < 0x8000) {
                     PCE.VRAM[IO_VDC_REG[MAWR].W] = (V << 8) | IO_VDC_REG_ACTIVE.B.l;
-                    OBJ_CACHE_INVALIDATE(IO_VDC_REG[MAWR].W);
                 }
                 IO_VDC_REG_INC(MAWR);
                 break;
@@ -418,9 +432,9 @@ IO_write(uint16_t A, uint8_t V)
 
             case BYR:                           // Vertical screen offset
                 gfx_latch_context(0);
-                ScrollYDiff = Scanline - 1 - IO_VDC_MINLINE;
-                if (ScrollYDiff < 0) {
-                    MESSAGE_DEBUG("ScrollYDiff went negative when substraction VPR.h/.l (%d,%d)\n",
+                PCE.ScrollYDiff = PCE.Scanline - 1 - IO_VDC_MINLINE;
+                if (PCE.ScrollYDiff < 0) {
+                    MESSAGE_DEBUG("PCE.ScrollYDiff went negative when substraction VPR.h/.l (%d,%d)\n",
                         IO_VDC_REG[VPR].B.h, IO_VDC_REG[VPR].B.l);
                 }
                 break;
@@ -460,7 +474,6 @@ IO_write(uint16_t A, uint8_t V)
                 while (IO_VDC_REG[LENR].W != 0xFFFF) {
                     if (IO_VDC_REG[DISTR].W < 0x8000) {
                         PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
-                        OBJ_CACHE_INVALIDATE(IO_VDC_REG[DISTR].W);
                     }
                     IO_VDC_REG[SOUR].W += src_inc;
                     IO_VDC_REG[DISTR].W += dst_inc;
@@ -614,10 +627,10 @@ IO_write(uint16_t A, uint8_t V)
     case 0x1400:                /* IRQ */
         switch (A & 3) {
         case 2:
-            PCE.irq_mask = V & INT_MASK;
+            CPU.irq_mask = V & INT_MASK;
             break;
         case 3:
-            PCE.irq_status &= ~INT_TIMER;
+            CPU.irq_lines &= ~INT_TIMER;
             break;
         }
         break;

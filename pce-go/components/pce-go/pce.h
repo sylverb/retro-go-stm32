@@ -1,9 +1,6 @@
-#ifndef _INCLUDE_HARD_PCE_H
-#define _INCLUDE_HARD_PCE_H
+#pragma once
 
-#include "../config.h"
-#include "stddef.h"
-#include "utils.h"
+#include "pce-go.h"
 
 // System clocks (hz)
 #define CLOCK_MASTER           (21477270)
@@ -85,7 +82,10 @@ typedef struct {
 	uint32_t dda_index;
 
 	uint32_t wave_accum;
-	uint32_t noise_accum;
+
+	int32_t noise_accum;
+	int32_t noise_level;
+	int32_t noise_rand;
 } psg_chan_t;
 
 typedef struct {
@@ -93,10 +93,10 @@ typedef struct {
 	uint8_t RAM[0x2000];
 
 	// Video RAM
-	uint16_t VRAM[0x10000 / 2];
+	uint16_t VRAM[0x8000];
 
 	// Sprite RAM
-	uint16_t SPRAM[64 * 4];
+	uint16_t SPRAM[0x100];
 
 	// Extra RAM contained on the HuCard (Populous)
 	uint8_t *ExRAM;
@@ -120,7 +120,10 @@ typedef struct {
 	uint8_t Palette[512];
 
 	// The current rendered line on screen
-	uint16_t Scanline;
+	uint32_t Scanline;
+
+	//
+	int ScrollYDiff;
 
 	// Number of executed CPU cycles
 	uint32_t Cycles;
@@ -131,11 +134,12 @@ typedef struct {
 	// Value of each of the MMR registers
 	uint8_t MMR[8];
 
+	// Effective memory map
+	uint8_t *MemoryMapR[256];
+	uint8_t *MemoryMapW[256];
+
 	// Street Fighter 2 Mapper
 	uint8_t SF2;
-
-	// Interrupts
-	uint8_t irq_mask, irq_status;
 
 	// Remanence latch
 	uint8_t io_buffer;
@@ -193,10 +197,7 @@ extern PCE_t PCE;
 // physical address on emulator machine of each of the 256 banks
 extern uint8_t *PageR[8];
 extern uint8_t *PageW[8];
-extern uint8_t *MemoryMapR[256];
-extern uint8_t *MemoryMapW[256];
 
-#define Scanline PCE.Scanline
 #define Cycles PCE.Cycles
 
 #define IO_VDC_REG           PCE.VDC.regs
@@ -227,12 +228,12 @@ extern uint8_t *MemoryMapW[256];
  */
 
 int  pce_init(void);
-void pce_reset(void);
+void pce_reset(bool hard);
 void pce_term(void);
 void pce_run(void);
-
-void IO_write(uint16_t A, uint8_t V);
-uint8_t IO_read(uint16_t A);
+void pce_pause(void);
+void pce_writeIO(uint16_t A, uint8_t V);
+uint8_t pce_readIO(uint16_t A);
 
 
 /**
@@ -242,25 +243,25 @@ uint8_t IO_read(uint16_t A);
 #if USE_MEM_MACROS
 
 #define pce_read8(addr) ({							\
-	uint16_t a = (addr);							\
+	uint32_t a = (addr);							\
 	uint8_t *page = PageR[a >> 13]; 				\
-	(page == PCE.IOAREA) ? IO_read(a) : page[a]; 	    \
+	(page == PCE.IOAREA) ? pce_readIO(a) : page[a]; \
 })
 
 #define pce_write8(addr, byte) {					\
-	uint16_t a = (addr), b = (byte); 				\
+	uint32_t a = (addr), b = (byte); 				\
 	uint8_t *page = PageW[a >> 13]; 				\
-	if (page == PCE.IOAREA) IO_write(a, b); 		    \
+	if (page == PCE.IOAREA) pce_writeIO(a, b); 		\
 	else page[a] = b;							    \
 }
 
 #define pce_read16(addr) ({							\
-	uint16_t a = (addr); 							\
+	uint32_t a = (addr); 							\
 	*((uint16_t*)(PageR[a >> 13] + a));			    \
 })
 
 #define pce_write16(addr, word) {					\
-	uint16_t a = (addr), w = (word); 				\
+	uint32_t a = (addr), w = (word); 				\
 	*((uint16_t*)(PageR[a >> 13] + a)) = w;		    \
 }
 
@@ -272,7 +273,7 @@ pce_read8(uint16_t addr)
 	uint8_t *page = PageR[addr >> 13];
 
 	if (page == PCE.IOAREA)
-		return IO_read(addr);
+		return pce_readIO(addr);
 	else
 		return page[addr];
 }
@@ -283,7 +284,7 @@ pce_write8(uint16_t addr, uint8_t byte)
 	uint8_t *page = PageW[addr >> 13];
 
 	if (page == PCE.IOAREA)
-		IO_write(addr, byte);
+		pce_writeIO(addr, byte);
 	else
 		page[addr] = byte;
 }
@@ -309,8 +310,6 @@ pce_bank_set(uint8_t P, uint8_t V)
 	TRACE_IO("Bank switching (MMR[%d] = %d)\n", P, V);
 
 	PCE.MMR[P] = V;
-	PageR[P] = (MemoryMapR[V] == PCE.IOAREA) ? (PCE.IOAREA) : (MemoryMapR[V] - P * 0x2000);
-	PageW[P] = (MemoryMapW[V] == PCE.IOAREA) ? (PCE.IOAREA) : (MemoryMapW[V] - P * 0x2000);
+	PageR[P] = (PCE.MemoryMapR[V] == PCE.IOAREA) ? (PCE.IOAREA) : (PCE.MemoryMapR[V] - P * 0x2000);
+	PageW[P] = (PCE.MemoryMapW[V] == PCE.IOAREA) ? (PCE.IOAREA) : (PCE.MemoryMapW[V] - P * 0x2000);
 }
-
-#endif

@@ -1,34 +1,49 @@
-// pce.c - Entry file to start/stop/reset/save emulation
+// pce-go.c - Entry file to start/stop/reset/save emulation
 //
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+#include "pce-go.h"
+#include "utils.h"
+#include "gfx.h"
+#include "psg.h"
 #include "pce.h"
-#include "romdb.h"
-
-struct host_machine host;
-
-const char SAVESTATE_HEADER[8] = "PCE_V004";
 
 /**
  * Describes what is saved in a save state. Changing the order will break
  * previous saves so add a place holder if necessary. Eventually we could use
  * the keys to make order irrelevant...
  */
+#define SVAR_1(k, v) { 1, k, &v }
+#define SVAR_2(k, v) { 2, k, &v }
+#define SVAR_4(k, v) { 4, k, &v }
+#define SVAR_A(k, v) { sizeof(v), k, &v }
+#define SVAR_N(k, v, n) { n, k, &v }
+#define SVAR_END { 0, "\0\0\0\0", 0 }
 
-const svar_t SaveStateVars[] =
+static const char SAVESTATE_HEADER[8] = "PCE_V004";
+static const struct
+{
+	size_t len;
+	char key[16];
+	void *ptr;
+} SaveStateVars[] =
 {
 	// Arrays
 	SVAR_A("RAM", PCE.RAM),      SVAR_A("VRAM", PCE.VRAM),  SVAR_A("SPRAM", PCE.SPRAM),
 	SVAR_A("PAL", PCE.Palette),  SVAR_A("MMR", PCE.MMR),
 
 	// CPU registers
-	SVAR_2("CPU.PC", reg_pc),    SVAR_1("CPU.A", reg_a),    SVAR_1("CPU.X", reg_x),
-	SVAR_1("CPU.Y", reg_y),      SVAR_1("CPU.P", reg_p),    SVAR_1("CPU.S", reg_s),
+	SVAR_2("CPU.PC", CPU.PC),    SVAR_1("CPU.A", CPU.A),    SVAR_1("CPU.X", CPU.X),
+	SVAR_1("CPU.Y", CPU.Y),      SVAR_1("CPU.P", CPU.P),    SVAR_1("CPU.S", CPU.S),
 
 	// Misc
 	SVAR_4("Cycles", Cycles),                   SVAR_4("MaxCycles", PCE.MaxCycles),
 	SVAR_1("SF2", PCE.SF2),
 
 	// IRQ
-	SVAR_1("irq_mask", PCE.irq_mask),           SVAR_1("irq_status", PCE.irq_status),
+	SVAR_1("irq_mask", CPU.irq_mask),           SVAR_1("irq_lines", CPU.irq_lines),
 
 	// PSG
 	SVAR_1("psg.ch", PCE.PSG.ch),               SVAR_1("psg.vol", PCE.PSG.volume),
@@ -52,6 +67,22 @@ const svar_t SaveStateVars[] =
 	SVAR_END
 };
 
+#define TWO_PART_ROM 0x0001
+#define ONBOARD_RAM  0x0100
+#define US_ENCODED   0x0010
+
+static const struct {
+	const uint32_t CRC;
+	const char *Name;
+	const uint32_t Flags;
+} romFlags[] = {
+	{0xF0ED3094, "Blazing Lazers", TWO_PART_ROM},
+	{0xB4A1B0F6, "Blazing Lazers", TWO_PART_ROM},
+	{0x55E9630D, "Legend of Hero Tonma", US_ENCODED},
+	{0x083C956A, "Populous", ONBOARD_RAM},
+	{0x0A9ADE99, "Populous", ONBOARD_RAM},
+	{0x00000000, "Unknown", 0},
+};
 
 /**
  * Load card into memory and set its memory map
@@ -81,7 +112,7 @@ LoadCard(const char *name)
 	offset = fsize & 0x1fff;
 
 	// read ROM
-	PCE.ROM = osd_alloc(fsize);
+	PCE.ROM = malloc(fsize);
 
 	if (PCE.ROM == NULL)
 	{
@@ -98,8 +129,8 @@ LoadCard(const char *name)
 	PCE.ROM_DATA = PCE.ROM + offset;
 	PCE.ROM_CRC = crc32_le(0, PCE.ROM, fsize);
 
-	uint IDX = 0;
-	uint ROM_MASK = 1;
+	uint32_t IDX = 0;
+	uint32_t ROM_MASK = 1;
 
 	while (ROM_MASK < PCE.ROM_SIZE) ROM_MASK <<= 1;
 	ROM_MASK--;
@@ -107,15 +138,13 @@ LoadCard(const char *name)
 	MESSAGE_INFO("ROM LOADED: OFFSET=%d, BANKS=%d, MASK=%03X, CRC=%08X\n",
 		offset, PCE.ROM_SIZE, ROM_MASK, PCE.ROM_CRC);
 
-	for (int index = 0; index < KNOWN_ROM_COUNT; index++) {
-		if (PCE.ROM_CRC == romFlags[index].CRC) {
-			IDX = index;
+	while (romFlags[IDX].CRC) {
+		if (PCE.ROM_CRC == romFlags[IDX].CRC)
 			break;
-		}
+		IDX++;
 	}
 
 	MESSAGE_INFO("Game Name: %s\n", romFlags[IDX].Name);
-	MESSAGE_INFO("Game Region: %s\n", (romFlags[IDX].Flags & JAP) ? "Japan" : "USA");
 
 	// US Encrypted
 	if ((romFlags[IDX].Flags & US_ENCODED) || PCE.ROM_DATA[0x1FFF] < 0xE0)
@@ -149,38 +178,38 @@ LoadCard(const char *name)
 			case 0x00:
 			case 0x10:
 			case 0x50:
-				MemoryMapR[i] = PCE.ROM_DATA + (i & ROM_MASK) * 0x2000;
+				PCE.MemoryMapR[i] = PCE.ROM_DATA + (i & ROM_MASK) * 0x2000;
 				break;
 			case 0x20:
 			case 0x60:
-				MemoryMapR[i] = PCE.ROM_DATA + ((i - 0x20) & ROM_MASK) * 0x2000;
+				PCE.MemoryMapR[i] = PCE.ROM_DATA + ((i - 0x20) & ROM_MASK) * 0x2000;
 				break;
 			case 0x30:
 			case 0x70:
-				MemoryMapR[i] = PCE.ROM_DATA + ((i - 0x10) & ROM_MASK) * 0x2000;
+				PCE.MemoryMapR[i] = PCE.ROM_DATA + ((i - 0x10) & ROM_MASK) * 0x2000;
 				break;
 			case 0x40:
-				MemoryMapR[i] = PCE.ROM_DATA + ((i - 0x20) & ROM_MASK) * 0x2000;
+				PCE.MemoryMapR[i] = PCE.ROM_DATA + ((i - 0x20) & ROM_MASK) * 0x2000;
 				break;
 			}
 		} else {
-			MemoryMapR[i] = PCE.ROM_DATA + (i & ROM_MASK) * 0x2000;
+			PCE.MemoryMapR[i] = PCE.ROM_DATA + (i & ROM_MASK) * 0x2000;
 		}
-		MemoryMapW[i] = PCE.NULLRAM;
+		PCE.MemoryMapW[i] = PCE.NULLRAM;
 	}
 
 	// Allocate the card's onboard ram
 	if (romFlags[IDX].Flags & ONBOARD_RAM) {
-		PCE.ExRAM = PCE.ExRAM ?: osd_alloc(0x8000);
-		MemoryMapR[0x40] = MemoryMapW[0x40] = PCE.ExRAM;
-		MemoryMapR[0x41] = MemoryMapW[0x41] = PCE.ExRAM + 0x2000;
-		MemoryMapR[0x42] = MemoryMapW[0x42] = PCE.ExRAM + 0x4000;
-		MemoryMapR[0x43] = MemoryMapW[0x43] = PCE.ExRAM + 0x6000;
+		PCE.ExRAM = PCE.ExRAM ?: malloc(0x8000);
+		PCE.MemoryMapR[0x40] = PCE.MemoryMapW[0x40] = PCE.ExRAM;
+		PCE.MemoryMapR[0x41] = PCE.MemoryMapW[0x41] = PCE.ExRAM + 0x2000;
+		PCE.MemoryMapR[0x42] = PCE.MemoryMapW[0x42] = PCE.ExRAM + 0x4000;
+		PCE.MemoryMapR[0x43] = PCE.MemoryMapW[0x43] = PCE.ExRAM + 0x6000;
 	}
 
 	// Mapper for roms >= 1.5MB (SF2, homebrews)
 	if (PCE.ROM_SIZE >= 192)
-		MemoryMapW[0x00] = PCE.IOAREA;
+		PCE.MemoryMapW[0x00] = PCE.IOAREA;
 
 	return 0;
 }
@@ -192,8 +221,8 @@ LoadCard(const char *name)
 void
 ResetPCE(bool hard)
 {
-	gfx_clear_cache();
-	pce_reset();
+	gfx_reset(hard);
+	pce_reset(hard);
 }
 
 
@@ -201,26 +230,65 @@ ResetPCE(bool hard)
  * Initialize the emulator (allocate memory, call osd_init* functions)
  */
 int
-InitPCE(const char *name)
+InitPCE(int samplerate, bool stereo, const char *huecard)
 {
-	if (osd_input_init())
-		return 1;
-
 	if (gfx_init())
 		return 1;
 
-	if (snd_init())
+	if (psg_init(samplerate, stereo))
 		return 1;
 
 	if (pce_init())
 		return 1;
 
-	if (LoadCard(name))
+	if (huecard && LoadCard(huecard))
 		return 1;
 
 	ResetPCE(0);
 
 	return 0;
+}
+
+
+/**
+ * Returns a 256 colors palette in the chosen depth
+ */
+void *
+PalettePCE(int bitdepth)
+{
+	if (bitdepth == 15) {
+		uint16_t *palette = malloc(256 * 2);
+		// ...
+		return palette;
+	}
+
+	if (bitdepth == 16) {
+		uint16_t *palette = malloc(256 * 2);
+		for (int i = 0; i < 255; i++) {
+			int r = (i & 0x1C) >> 1;
+			int g = (i & 0xe0) >> 4;
+			int b = (i & 0x03) << 2;
+			palette[i] = (((r << 12) & 0xf800) + ((g << 7) & 0x07e0) + ((b << 1) & 0x001f));
+		}
+		palette[255] = 0xFFFF;
+		return palette;
+	}
+
+	if (bitdepth == 24) {
+		uint8_t *palette = malloc(256 * 3);
+		uint8_t *ptr = palette;
+		for (int i = 0; i < 255; i++) {
+			*ptr++ = (i & 0x1C) << 2;
+			*ptr++ = (i & 0xe0) >> 1;
+			*ptr++ = (i & 0x03) << 4;
+		}
+		*ptr++ = 0xFF;
+		*ptr++ = 0xFF;
+		*ptr++ = 0xFF;
+		return palette;
+	}
+
+	return NULL;
 }
 
 
@@ -238,7 +306,7 @@ RunPCE(void)
  * Load saved state
  */
 int
-LoadState(char *name)
+LoadState(const char *name)
 {
 	MESSAGE_INFO("Loading state from %s...\n", name);
 
@@ -268,7 +336,7 @@ LoadState(char *name)
 		pce_bank_set(i, PCE.MMR[i]);
 	}
 
-	gfx_clear_cache();
+	gfx_reset(true);
 
 	osd_gfx_set_mode(IO_VDC_SCREEN_WIDTH, IO_VDC_SCREEN_HEIGHT);
 
@@ -282,7 +350,7 @@ LoadState(char *name)
  * Save current state
  */
 int
-SaveState(char *name)
+SaveState(const char *name)
 {
 	MESSAGE_INFO("Saving state to %s...\n", name);
 
@@ -311,7 +379,7 @@ void
 ShutdownPCE()
 {
 	gfx_term();
-	snd_term();
+	psg_term();
 	pce_term();
 
 	exit(0);

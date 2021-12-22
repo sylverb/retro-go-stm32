@@ -21,7 +21,7 @@
 		{
 			"path": "nofrendo-go"
 		},
-		{
+				{
 			"path": "pce-go"
 		},
 		{
@@ -68,7 +68,7 @@
 		"C_Cpp.default.cppStandard": "c++11",
 		"C_Cpp.default.intelliSenseMode": "gcc-x64",
 		"cSpell.words": [
-			"pce-go",
+			"huexpress",
 			"nofrendo",
 			"smsplusgx",
 			"supergraphx"

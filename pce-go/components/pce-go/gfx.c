@@ -1,93 +1,69 @@
 // gfx.c - VDC/VCE Emulation
 //
+#include <stdlib.h>
+#include <string.h>
+#include "utils.h"
 #include "pce.h"
+#include "gfx.h"
 
-static gfx_context_t gfx_context;
-static int line_counter = 0;
-static int last_line_counter = 0;
-
-// Active screen buffer
-static uint8_t* screen_buffer;
-
-// Cache for linear tiles and sprites. This is basically a decoded VRAM
-static uint32_t *OBJ_CACHE;
-bool TILE_CACHE[2048];
-bool SPR_CACHE[512];
-
-//
-int ScrollYDiff;
+typedef struct
+{
+	uint16_t y; 	/* Vertical position */
+	uint16_t x; 	/* Horizontal position */
+	uint16_t no;   	/* Offset in VRAM */
+	uint16_t attr; 	/* Attributes */
+	/*
+		* bit 0-4 : number of the palette to be used
+		* bit 7 : background sprite
+		*          0 -> must be drawn behind tiles
+		*          1 -> must be drawn in front of tiles
+		* bit 8 : width
+		*          0 -> 16 pixels
+		*          1 -> 32 pixels
+		* bit 11 : horizontal flip
+		*          0 -> normal shape
+		*          1 -> must be draw horizontally flipped
+		* bit 13-12 : height
+		*          00 -> 16 pixels
+		*          01 -> 32 pixels
+		*          10 -> 48 pixels
+		*          11 -> 64 pixels
+		* bit 15 : vertical flip
+		*          0 -> normal shape
+		*          1 -> must be drawn vertically flipped
+	*/
+} sprite_t;
 
 #define PAL(nibble) (PAL[(L >> ((nibble) * 4)) & 15])
 
+#define V_FLIP  0x8000
+#define H_FLIP  0x0800
 
-/*
-	Convert a PCE coded sprite into a linear one
-*/
-static inline void
-spr2pixel(int no)
-{
-	uint8_t *C = (uint8_t *)(PCE.VRAM + no * 64);
-	uint32_t *C2 = OBJ_CACHE + no * 32;
-	// 2 longs -> 16 nibbles => 32 loops for a 16*16 spr
+static int last_line_counter = 0;
+static int line_counter = 0;
 
-	TRACE_SPR("Planing sprite %d\n", no);
-	for (int i = 0; i < 32; i++, C++, C2++) {
-		uint32_t M, L;
-		M = C[0];
-		L = ((M & 0x88) >> 3) | ((M & 0x44) << 6) | ((M & 0x22) << 15) | ((M & 0x11) << 24);
-		M = C[32];
-		L |= ((M & 0x88) >> 2) | ((M & 0x44) << 7) | ((M & 0x22) << 16) | ((M & 0x11) << 25);
-		M = C[64];
-		L |= ((M & 0x88) >> 1) | ((M & 0x44) << 8) | ((M & 0x22) << 17) | ((M & 0x11) << 26);
-		M = C[96];
-		L |= ((M & 0x88)) | ((M & 0x44) << 9) | ((M & 0x22) << 18) | ((M & 0x11) << 27);
-		C2[0] = L;
-	}
-	SPR_CACHE[no] = 1;
-}
-
-
-/*
-	Convert a PCE coded tile into a linear one
-*/
-static inline void
-tile2pixel(int no)
-{
-	uint8_t *C = (uint8_t *)(PCE.VRAM + no * 16);
-	uint32_t *C2 = OBJ_CACHE + no * 8;
-
-	TRACE_SPR("Planing tile %d\n", no);
-	for (int i = 0; i < 8; i++, C += 2, C2++) {
-		uint32_t M, L;
-		M = C[0];
-		L = ((M & 0x88) >> 3) | ((M & 0x44) << 6) | ((M & 0x22) << 15) | ((M & 0x11) << 24);
-		M = C[1];
-		L |= ((M & 0x88) >> 2) | ((M & 0x44) << 7) | ((M & 0x22) << 16) | ((M & 0x11) << 25);
-		M = C[16];
-		L |= ((M & 0x88) >> 1) | ((M & 0x44) << 8) | ((M & 0x22) << 17) | ((M & 0x11) << 26);
-		M = C[17];
-		L |= ((M & 0x88)) | ((M & 0x44) << 9) | ((M & 0x22) << 18) | ((M & 0x11) << 27);
-		C2[0] = L;
-	}
-	TILE_CACHE[no] = 1;
-}
+static struct {
+	int scroll_x;
+	int scroll_y;
+	int control;
+	int latched;
+} gfx_context;
 
 
 /*
 	Draw background tiles between two lines
 */
 static void // Do not inline
-draw_tiles(int Y1, int Y2, int scroll_x, int scroll_y)
+draw_tiles(uint8_t *screen_buffer, int Y1, int Y2, int scroll_x, int scroll_y)
 {
 	const uint8_t _bg_w[] = { 32, 64, 128, 128 };
 	const uint8_t _bg_h[] = { 32, 64 };
 
-	uint8_t bg_w = _bg_w[(IO_VDC_REG[MWR].W >> 4) & 3]; // Bits 5-4 select the width
-    uint8_t bg_h = _bg_h[(IO_VDC_REG[MWR].W >> 6) & 1]; // Bit 6 selects the height
+	int bg_w = _bg_w[(IO_VDC_REG[MWR].W >> 4) & 3]; // Bits 5-4 select the width
+    int bg_h = _bg_h[(IO_VDC_REG[MWR].W >> 6) & 1]; // Bit 6 selects the height
 
 	int XW, no, x, y, h, offset;
 	uint8_t *PP, *PAL, *P, *C;
-	uint32_t *C2;
 
 	if (Y1 == 0) {
 		TRACE_GFX("\n=================================================\n");
@@ -118,22 +94,25 @@ draw_tiles(int Y1, int Y2, int scroll_x, int scroll_y)
 			// PCE has max of 2048 tiles
 			no &= 0x7FF;
 
-			if (TILE_CACHE[no] == 0) {
-				tile2pixel(no);
-			}
-
-			C2 = OBJ_CACHE + (no * 8 + offset);
 			C = (uint8_t*)(PCE.VRAM + no * 16 + offset);
 			P = PP;
-			for (int i = 0; i < h; i++, P += XBUF_WIDTH, C2++, C += 2) {
-				uint32_t J, L;
+			for (int i = 0; i < h; i++, P += XBUF_WIDTH, C += 2) {
+				uint32_t J, L, M;
 
 				J = C[0] | C[1] | C[16] | C[17];
 
 				if (!J)
 					continue;
 
-				L = C2[0];
+				M = C[0];
+				L = ((M & 0x88) >> 3) | ((M & 0x44) << 6) | ((M & 0x22) << 15) | ((M & 0x11) << 24);
+				M = C[1];
+				L |= ((M & 0x88) >> 2) | ((M & 0x44) << 7) | ((M & 0x22) << 16) | ((M & 0x11) << 25);
+				M = C[16];
+				L |= ((M & 0x88) >> 1) | ((M & 0x44) << 8) | ((M & 0x22) << 17) | ((M & 0x11) << 26);
+				M = C[17];
+				L |= ((M & 0x88) >> 0) | ((M & 0x44) << 9) | ((M & 0x22) << 18) | ((M & 0x11) << 27);
+
 				if (J & 0x80) P[0] = PAL(1);
 				if (J & 0x40) P[1] = PAL(3);
 				if (J & 0x20) P[2] = PAL(5);
@@ -158,24 +137,36 @@ draw_tiles(int Y1, int Y2, int scroll_x, int scroll_y)
 	Draw sprite C to framebuffer P
 */
 static void // Do not inline (take advantage of xtensa's windowed registers)
-draw_sprite(uint8_t *P, uint16_t *C, uint32_t *C2, int height, uint16_t attr)
+draw_sprite(uint8_t *P, uint16_t *C, int height, uint16_t attr)
 {
 	uint8_t *PAL = &PCE.Palette[256 + ((attr & 0xF) << 4)];
 
 	bool hflip = attr & H_FLIP;
 	int inc = (attr & V_FLIP) ? -1 : 1;
-	int inc2 = inc * 2;
 
-	for (int i = 0; i < height; i++, C += inc, C2 += inc2, P += XBUF_WIDTH) {
+	for (int i = 0; i < height; i++, C += inc, P += XBUF_WIDTH) {
 
 		uint16_t J = C[0] | C[16] | C[32] | C[48];
-		uint32_t L;
+		uint32_t L1, L2, L, M;
 
 		if (!J)
 			continue;
 
+		M = C[0];
+		L1 = ((M & 0x88) >> 3) | ((M & 0x44) << 6) | ((M & 0x22) << 15) | ((M & 0x11) << 24);
+		L2 = ((M & 0x8800) >> 11) | ((M & 0x4400) >> 2) | ((M & 0x2200) << 7) | ((M & 0x1100) << 16);
+		M = C[16];
+		L1 |= ((M & 0x88) >> 2) | ((M & 0x44) << 7) | ((M & 0x22) << 16) | ((M & 0x11) << 25);
+		L2 |= ((M & 0x8800) >> 10) | ((M & 0x4400) >> 1) | ((M & 0x2200) << 8) | ((M & 0x1100) << 17);
+		M = C[32];
+		L1 |= ((M & 0x88) >> 1) | ((M & 0x44) << 8) | ((M & 0x22) << 17) | ((M & 0x11) << 26);
+		L2 |= ((M & 0x8800) >> 9) | ((M & 0x4400) >> 0) | ((M & 0x2200) << 9) | ((M & 0x1100) << 18);
+		M = C[48];
+		L1 |= ((M & 0x88) >> 0) | ((M & 0x44) << 9) | ((M & 0x22) << 18) | ((M & 0x11) << 27);
+		L2 |= ((M & 0x8800) >> 8) | ((M & 0x4400) << 1) | ((M & 0x2200) << 10) | ((M & 0x1100) << 19);
+
 		if (hflip) {
-			L = C2[1];
+			L = L2;
 			if ((J & 0x8000)) P[15] = PAL(1);
 			if ((J & 0x4000)) P[14] = PAL(3);
 			if ((J & 0x2000)) P[13] = PAL(5);
@@ -185,7 +176,7 @@ draw_sprite(uint8_t *P, uint16_t *C, uint32_t *C2, int height, uint16_t attr)
 			if ((J & 0x0200)) P[9]  = PAL(4);
 			if ((J & 0x0100)) P[8]  = PAL(6);
 
-			L = C2[0];
+			L = L1;
 			if ((J & 0x80)) P[7] = PAL(1);
 			if ((J & 0x40)) P[6] = PAL(3);
 			if ((J & 0x20)) P[5] = PAL(5);
@@ -196,7 +187,7 @@ draw_sprite(uint8_t *P, uint16_t *C, uint32_t *C2, int height, uint16_t attr)
 			if ((J & 0x01)) P[0] = PAL(6);
 		}
 		else {
-			L = C2[1];
+			L = L2;
 			if ((J & 0x8000)) P[0] = PAL(1);
 			if ((J & 0x4000)) P[1] = PAL(3);
 			if ((J & 0x2000)) P[2] = PAL(5);
@@ -206,7 +197,7 @@ draw_sprite(uint8_t *P, uint16_t *C, uint32_t *C2, int height, uint16_t attr)
 			if ((J & 0x0200)) P[6] = PAL(4);
 			if ((J & 0x0100)) P[7] = PAL(6);
 
-			L = C2[0];
+			L = L1;
 			if ((J & 0x80)) P[8]  = PAL(1);
 			if ((J & 0x40)) P[9]  = PAL(3);
 			if ((J & 0x20)) P[10] = PAL(5);
@@ -224,7 +215,7 @@ draw_sprite(uint8_t *P, uint16_t *C, uint32_t *C2, int height, uint16_t attr)
 	Draw sprites between two lines
 */
 static void // Do not inline
-draw_sprites(int Y1, int Y2, int priority)
+draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 {
 	// NOTE: At this time we do not respect bg sprites priority over top sprites.
 	// Example: Assume that sprite #2 is priority=0 and sprite #5 is priority=1. If they
@@ -259,23 +250,13 @@ draw_sprites(int Y1, int Y2, int priority)
 			continue;
 		}
 
-		for (int i = 0; i < cgy * 2 + cgx + 1; i++) {
-			if (SPR_CACHE[no + i] == 0) {
-				spr2pixel(no + i);
-			}
-			if (!cgx)
-				i++;
-		}
-
 		uint8_t *P = screen_buffer + (XBUF_WIDTH * y + x);
 		uint16_t *C = PCE.VRAM + (no * 64);
-		uint32_t *C2 = OBJ_CACHE + (no * 32);
 
 		cgy *= 16;
 
 		if (attr & V_FLIP) {
 			C += 15 * 2 + cgy * 8;
-			C2 += 15 * 2 + cgy * 4;
 		}
 
 		for (int yy = 0; yy <= cgy; yy += 16) {
@@ -284,7 +265,6 @@ draw_sprites(int Y1, int Y2, int priority)
 
 			if (t > 0) {
 				C += t * inc;
-				C2 += t * inc * 2;
 				h -= t;
 				P += t * XBUF_WIDTH;
 			}
@@ -294,17 +274,16 @@ draw_sprites(int Y1, int Y2, int priority)
 
 			if (attr & H_FLIP) {
 				for (int j = 0; j <= cgx; j++) {
-					draw_sprite(P + (cgx - j) * 16, C + j * 64, C2 + j * 32, h, attr);
+					draw_sprite(P + (cgx - j) * 16, C + j * 64, h, attr);
 				}
 			} else {
 				for (int j = 0; j <= cgx; j++) {
-					draw_sprite(P + j * 16, C + j * 64, C2 + j * 32, h, attr);
+					draw_sprite(P + j * 16, C + j * 64, h, attr);
 				}
 			}
 
 			P += h * XBUF_WIDTH;
 			C += (h + 16 * 7) * inc;
-			C2 += (h + 16) * (inc * 2);
 		}
 	}
 }
@@ -341,7 +320,7 @@ gfx_latch_context(int force)
 {
 	if (!gfx_context.latched || force) { // Context is already saved + we haven't render the line using it
 		gfx_context.scroll_x = IO_VDC_REG[BXR].W;
-		gfx_context.scroll_y = IO_VDC_REG[BYR].W - ScrollYDiff;
+		gfx_context.scroll_y = IO_VDC_REG[BYR].W - PCE.ScrollYDiff;
 		gfx_context.control = IO_VDC_REG[CR].W;
 		gfx_context.latched = 1;
 	}
@@ -356,23 +335,31 @@ render_lines(int min_line, int max_line)
 {
 	gfx_context.latched = 0;
 
+	uint8_t *screen_buffer = osd_gfx_framebuffer();
 	if (!screen_buffer) {
 		return;
 	}
 
+	// We must fill the region with color 0 first
+	// memset(screen_buffer + (min_line * XBUF_WIDTH), PCE.Palette[0], XBUF_WIDTH * (max_line - min_line + 1));
+	size_t screen_width = IO_VDC_SCREEN_WIDTH;
+	for (int y = min_line; y <= max_line; y++) {
+		memset(screen_buffer + (y * XBUF_WIDTH), PCE.Palette[0], screen_width);
+	}
+
 	// Sprites with priority 0 are drawn behind the tiles
 	if (gfx_context.control & 0x40) {
-		draw_sprites(min_line, max_line, 0);
+		draw_sprites(screen_buffer, min_line, max_line, 0);
 	}
 
 	// Draw the background tiles
 	if (gfx_context.control & 0x80) {
-		draw_tiles(min_line, max_line, gfx_context.scroll_x, gfx_context.scroll_y);
+		draw_tiles(screen_buffer, min_line, max_line, gfx_context.scroll_x, gfx_context.scroll_y);
 	}
 
 	// Draw regular sprites
 	if (gfx_context.control & 0x40) {
-		draw_sprites(min_line, max_line, 1);
+		draw_sprites(screen_buffer, min_line, max_line, 1);
 	}
 }
 
@@ -380,33 +367,23 @@ render_lines(int min_line, int max_line)
 int
 gfx_init(void)
 {
-	OBJ_CACHE = osd_alloc(0x10000);
-
-	gfx_clear_cache();
-
-	osd_gfx_init();
-
+	gfx_reset(true);
 	return 0;
 }
 
 
 void
-gfx_clear_cache(void)
+gfx_reset(bool hard)
 {
-	memset(&SPR_CACHE, 0, sizeof(SPR_CACHE));
-	memset(&TILE_CACHE, 0, sizeof(TILE_CACHE));
+	last_line_counter = 0;
+	line_counter = 0;
 }
 
 
 void
 gfx_term(void)
 {
-	if (OBJ_CACHE) {
-		free(OBJ_CACHE);
-		OBJ_CACHE = NULL;
-	}
-
-	osd_gfx_shutdown();
+	//
 }
 
 
@@ -424,13 +401,13 @@ gfx_irq(int type)
 		PCE.VDC.pending_irqs |= type & 0xF;
 	}
 
-	/* Pop the first pending vdc interrupt only if PCE.irq_status is clear */
+	/* Pop the first pending vdc interrupt only if CPU.irq_lines is clear */
 	int pos = 28;
-	while (!(PCE.irq_status & INT_IRQ1) && PCE.VDC.pending_irqs) {
+	while (!(CPU.irq_lines & INT_IRQ1) && PCE.VDC.pending_irqs) {
 		if (PCE.VDC.pending_irqs >> pos) {
 			PCE.VDC.status |= 1 << (PCE.VDC.pending_irqs >> pos);
 			PCE.VDC.pending_irqs &= ~(0xF << pos);
-			PCE.irq_status |= INT_IRQ1; // Notify the CPU
+			CPU.irq_lines |= INT_IRQ1; // Notify the CPU
 		}
 		pos -= 4;
 	}
@@ -443,7 +420,7 @@ gfx_irq(int type)
 void
 gfx_run(void)
 {
-	screen_buffer = osd_gfx_framebuffer();
+	int scanline = PCE.Scanline;
 
 	/* DMA Transfer in "progress" */
 	if (PCE.VDC.satb > DMA_TRANSFER_COUNTER) {
@@ -456,10 +433,10 @@ gfx_run(void)
 
 	/* Test raster hit */
 	if (RasHitON) {
-		uint raster_hit = (IO_VDC_REG[RCR].W & 0x3FF) - 64;
-		uint current_line = Scanline - IO_VDC_MINLINE + 1;
+		int raster_hit = (IO_VDC_REG[RCR].W & 0x3FF) - 64;
+		int current_line = scanline - IO_VDC_MINLINE + 1;
 		if (current_line == raster_hit && raster_hit < 263) {
-			TRACE_GFX("\n-----------------RASTER HIT (%d)------------------\n", Scanline);
+			TRACE_GFX("\n-----------------RASTER HIT (%d)------------------\n", scanline);
 			gfx_irq(VDC_STAT_RR);
 		}
 	}
@@ -470,7 +447,7 @@ gfx_run(void)
 			gfx_latch_context(1);
 		}
 
-		if (Scanline >= IO_VDC_MINLINE && Scanline <= IO_VDC_MAXLINE) {
+		if (scanline >= IO_VDC_MINLINE && scanline <= IO_VDC_MAXLINE) {
 			if (gfx_context.latched) {
 				render_lines(last_line_counter, line_counter);
 				last_line_counter = line_counter;
@@ -479,7 +456,7 @@ gfx_run(void)
 		}
 	}
 	/* V Blank trigger line */
-	else if (Scanline == 256) {
+	else if (scanline == 256) {
 
 		// Draw any lines left in the context
 		gfx_latch_context(0);
@@ -513,7 +490,7 @@ gfx_run(void)
 		gfx_context.latched = 0;
 		last_line_counter = 0;
 		line_counter = 0;
-		ScrollYDiff = 0;
+		PCE.ScrollYDiff = 0;
 	}
 
 	/* Always call at least once (to handle pending IRQs) */
