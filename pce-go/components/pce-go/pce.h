@@ -307,7 +307,7 @@ pce_write16(uint16_t addr, uint16_t word)
 static inline void
 pce_bank_set(uint8_t P, uint8_t V)
 {
-	TRACE_IO("Bank switching (MMR[%d] = %d)\n", P, V);
+	//TRACE_IO("Bank switching (MMR[%d] = %d)\n", P, V);
 
 	PCE.MMR[P] = V;
 	PageR[P] = (PCE.MemoryMapR[V] == PCE.IOAREA) ? (PCE.IOAREA) : (PCE.MemoryMapR[V] - P * 0x2000);

@@ -315,8 +315,7 @@ sprite_hit_check(void)
 }
 
 
-IRAM_ATTR void
-gfx_latch_context(int force)
+void gfx_latch_context(int force)
 {
 	if (!gfx_context.latched || force) { // Context is already saved + we haven't render the line using it
 		gfx_context.scroll_x = IO_VDC_REG[BXR].W;
@@ -442,8 +441,8 @@ gfx_run(void)
 	}
 
 	/* Visible area */
-	if (Scanline >= 14 && Scanline <= 255) {
-		if (Scanline == IO_VDC_MINLINE) {
+	if (scanline >= 14 && scanline <= 255) {
+		if (scanline == IO_VDC_MINLINE) {
 			gfx_latch_context(1);
 		}
 
