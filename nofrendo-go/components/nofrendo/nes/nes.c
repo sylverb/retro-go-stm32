@@ -85,11 +85,11 @@ INLINE void renderframe()
 /* main emulation loop */
 void nes_emulate(void)
 {
+   bool first_iteration = true;
+
    // Discard the garbage frames
    renderframe();
    renderframe();
-
-   osd_loadstate();
 
    while (false == nes.poweroff)
    {
@@ -107,6 +107,12 @@ void nes_emulate(void)
       // osd_submit_audio(apu.buffer, apu.samples_per_frame);
 
       osd_vsync();
+
+      // Some games require one emulation iteration to be performed before being able to load properly
+      if (first_iteration) {
+         first_iteration = false;
+         osd_loadstate();
+      }
    }
 }
 
