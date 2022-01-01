@@ -7,3 +7,4 @@ sdkconfig
 /*.fw
 /*.zip
 __pycache__/
+*.sw[mnop]

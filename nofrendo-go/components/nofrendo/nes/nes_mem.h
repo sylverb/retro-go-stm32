@@ -89,5 +89,6 @@ extern uint8 *mem_getpage(uint16 page);
 extern uint8 mem_getbyte(uint32 address);
 extern uint32 mem_getword(uint32 address);
 extern void mem_putbyte(uint32 address, uint8 value);
+extern void mem_rom_putbyte(uint32 address, uint8 value);
 
 #endif

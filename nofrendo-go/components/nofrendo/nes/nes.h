@@ -99,7 +99,7 @@ extern nes_t *nes_getptr(void);
 extern int  nes_init(region_t region, int sample_rate, bool stereo);
 extern void nes_shutdown(void);
 extern void nes_setregion(region_t region);
-extern int  nes_insertcart(const char *filename);
+extern int  nes_insertcart(const char *filename, const char **game_genie_codes, int game_genie_codes_count);
 extern void nes_emulate(void);
 extern void nes_reset(reset_type_t reset_type);
 extern void nes_poweroff(void);

@@ -106,7 +106,7 @@ typedef  unsigned int   uint32;
 /* End basic types */
 
 
-extern int nofrendo_start(const char *filename, int region, int sample_rate, bool stereo);
+extern int nofrendo_start(const char *filename, const char **game_genie_codes, int game_genie_codes_count, int region, int sample_rate, bool stereo);
 extern void nofrendo_stop(void);
 extern void nofrendo_printf(int type, const char *prefix, const char *format, ...);
 extern void nofrendo_assert(int expr, int line, const char *file, char *msg);

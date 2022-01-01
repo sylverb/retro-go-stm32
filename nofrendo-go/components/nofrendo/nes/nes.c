@@ -30,6 +30,8 @@
 #include <nes.h>
 
 #include "gw_lcd.h"
+#include "game_genie.h"
+#include "odroid_settings.h"
 
 #define NES_OVERDRAW (8)
 
@@ -142,12 +144,16 @@ void nes_setcompathacks(void)
 }
 
 /* insert a cart into the NES */
-int nes_insertcart(const char *filename)
+int nes_insertcart(const char *filename, const char **game_genie_codes, int game_genie_codes_count)
 {
    /* rom file */
    nes.rominfo = rom_load(filename);
    if (NULL == nes.rominfo)
       goto _fail;
+
+#if GAME_GENIE == 1
+   gameGenieInitialize(game_genie_codes, game_genie_codes_count);
+#endif
 
    /* mapper */
    nes.mmc = mmc_init(nes.rominfo);
@@ -200,6 +206,9 @@ void nes_shutdown(void)
    ppu_shutdown();
    apu_shutdown();
    nes6502_shutdown();
+#if GAME_GENIE == 1
+   gameGenieShutdown();
+#endif
 }
 
 /* Setup region-dependant timings */

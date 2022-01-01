@@ -29,6 +29,7 @@
 #include "nes_ppu.h"
 #include "nes_mmc.h"
 #include "nes_rom.h"
+#include "game_genie.h"
 
 #define  MMC_8KPRG         (mmc.prg_banks * 2)
 #define  MMC_16KPRG        (mmc.prg_banks)
@@ -99,6 +100,9 @@ void mmc_bankptr(int size, uint32 address, int bank, uint8 *ptr)
 void mmc_bankrom(int size, uint32 address, int bank)
 {
    mmc_bankptr(size, address, bank, mmc.prg);
+#if GAME_GENIE == 1
+   gameGeniePatchRom(mem_getbyte, mem_rom_putbyte);
+#endif
 }
 
 /* PRG-RAM bankswitching */

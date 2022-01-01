@@ -31,6 +31,9 @@
 #include <nes_input.h>
 #include <osd.h>
 #include <nes.h>
+#if GAME_GENIE == 1
+#include "game_genie.h"
+#endif
 
 static mem_t mem;
 
@@ -175,6 +178,27 @@ IRAM_ATTR uint8 mem_getbyte(uint32 address)
    else
    {
       return page[address];
+   }
+}
+
+/* write a byte of data to the PRG ROM. Useful for code injection like by the Game Genie */
+IRAM_ATTR void mem_rom_putbyte(uint32 address, uint8 value)
+{
+   if (address < 0x8000 || address > 0xFFFF) {
+      MESSAGE_DEBUG("Writing to illegal rom address: $%4X\n", address);
+   }
+
+   uint8 *page = mem.pages_read[address >> MEM_PAGESHIFT];
+
+   /* Unmapped region */
+   if (page == NULL)
+   {
+      MESSAGE_DEBUG("Write unmapped region: $%4X\n", address);
+   }
+   /* Paged memory */
+   else
+   {
+      page[address] = value;
    }
 }
 
