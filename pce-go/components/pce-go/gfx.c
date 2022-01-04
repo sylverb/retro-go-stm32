@@ -142,8 +142,11 @@ draw_sprite(uint8_t *P, uint16_t *C, int height, uint16_t attr)
 	uint8_t *PAL = &PCE.Palette[256 + ((attr & 0xF) << 4)];
 
 	bool hflip = attr & H_FLIP;
-	int inc = (attr & V_FLIP) ? -1 : 1;
-
+	int inc = 1;//(attr & V_FLIP) ? -1 : 1;
+    if (attr & V_FLIP) {
+		inc = -1;
+		C = C + height - 1;
+	}
 	for (int i = 0; i < height; i++, C += inc, P += XBUF_WIDTH) {
 
 		uint16_t J = C[0] | C[16] | C[32] | C[48];
@@ -222,7 +225,7 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 	// overlap then sprite #5 shouldn't be drawn because #2 > #5. But currently it will.
 
 	// We iterate sprites in reverse order because earlier sprites have
-	// higher priority and therefore must overwrite later sprites.
+	// higher priority and therefore must overwrite later sprites.	
 
 	for (int n = 63; n >= 0; n--) {
 		sprite_t *spr = (sprite_t *)PCE.SPRAM + n;
@@ -256,10 +259,28 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 		cgy *= 16;
 
 		if (attr & V_FLIP) {
-			C += 15 * 2 + cgy * 8;
-		}
+			P = P + cgy * XBUF_WIDTH;
+			for (int yy = cgy; yy >= 0; yy -= 16) {
+				int h = 16;
 
-		for (int yy = 0; yy <= cgy; yy += 16) {
+				if (h > Y2 - y - yy)
+					h = Y2 - y - yy;
+
+				if (attr & H_FLIP) {
+					for (int j = 0; j <= cgx; j++) {
+						draw_sprite(P + (cgx - j) * 16, C + j * 64, h, attr);
+					}
+				} else {
+					for (int j = 0; j <= cgx; j++) {
+						draw_sprite(P + j * 16, C + j * 64, h, attr);
+					}
+				}
+
+				P -= h * XBUF_WIDTH;
+				C += (h + 16 * 7);// * inc;
+			}
+		} else {
+			for (int yy = 0; yy <= cgy; yy += 16) {
 			int t = Y1 - y - yy;
 			int h = 16;
 
@@ -269,22 +290,24 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 				P += t * XBUF_WIDTH;
 			}
 
-			if (h > Y2 - y - yy)
-				h = Y2 - y - yy;
+				if (h > Y2 - y - yy)
+					h = Y2 - y - yy;
 
-			if (attr & H_FLIP) {
-				for (int j = 0; j <= cgx; j++) {
-					draw_sprite(P + (cgx - j) * 16, C + j * 64, h, attr);
+				if (attr & H_FLIP) {
+					for (int j = 0; j <= cgx; j++) {
+						draw_sprite(P + (cgx - j) * 16, C + j * 64, h, attr);
+					}
+				} else {
+					for (int j = 0; j <= cgx; j++) {
+						draw_sprite(P + j * 16, C + j * 64, h, attr);
+					}
 				}
-			} else {
-				for (int j = 0; j <= cgx; j++) {
-					draw_sprite(P + j * 16, C + j * 64, h, attr);
-				}
+
+				P += h * XBUF_WIDTH;
+				C += (h + 16 * 7);// * inc;
 			}
-
-			P += h * XBUF_WIDTH;
-			C += (h + 16 * 7) * inc;
 		}
+
 	}
 }
 
