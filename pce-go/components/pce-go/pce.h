@@ -12,6 +12,7 @@
 #define CYCLES_PER_FRAME       (CLOCK_CPU / 60)
 #define CYCLES_PER_LINE        (CYCLES_PER_FRAME / 263 + 1)
 #define CYCLES_PER_TIMER_TICK  (1024) // 1097
+//#define CYCLES_PER_TIMER_TICK  (1097)
 
 // VDC Status Flags (vdc_status bit)
 typedef enum {
@@ -146,6 +147,7 @@ typedef struct {
 
 	// Timer
 	struct {
+		uint16_t cycles_per_line;
 		uint16_t cycles_counter;
 		uint16_t counter;
 		uint16_t reload;

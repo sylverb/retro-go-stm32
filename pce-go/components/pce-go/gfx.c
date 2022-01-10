@@ -58,9 +58,9 @@ draw_tiles(uint8_t *screen_buffer, int Y1, int Y2, int scroll_x, int scroll_y)
 {
 	const uint8_t _bg_w[] = { 32, 64, 128, 128 };
 	const uint8_t _bg_h[] = { 32, 64 };
-
-	int bg_w = _bg_w[(IO_VDC_REG[MWR].W >> 4) & 3]; // Bits 5-4 select the width
-    int bg_h = _bg_h[(IO_VDC_REG[MWR].W >> 6) & 1]; // Bit 6 selects the height
+	
+	uint32_t bg_w = _bg_w[(IO_VDC_REG[MWR].W >> 4) & 3]; // Bits 5-4 select the width
+    uint32_t bg_h = _bg_h[(IO_VDC_REG[MWR].W >> 6) & 1]; // Bit 6 selects the height
 
 	int XW, no, x, y, h, offset;
 	uint8_t *PP, *PAL, *P, *C;
@@ -225,8 +225,8 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 	// overlap then sprite #5 shouldn't be drawn because #2 > #5. But currently it will.
 
 	// We iterate sprites in reverse order because earlier sprites have
-	// higher priority and therefore must overwrite later sprites.	
-
+	// higher priority and therefore must overwrite later sprites.
+	
 	for (int n = 63; n >= 0; n--) {
 		sprite_t *spr = (sprite_t *)PCE.SPRAM + n;
 		uint16_t attr = spr->attr;
@@ -241,7 +241,7 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 		int inc = (attr & V_FLIP) ? -1 : 1;
 		int no = (spr->no & 0x7FF);
 
-		TRACE_GFX("Sprite 0x%02X : X = %d, Y = %d, attr = %d, no = %d\n", n, x, y, attr, no);
+		TRACE_SPR("Sprite 0x%02X : X = %d, Y = %d, attr = %d, no = %d\n", n, x, y, attr, no);
 
 		cgy |= cgy >> 1;
 		no = (no >> 1) & ~(cgy * 2 + cgx);
@@ -455,12 +455,16 @@ gfx_run(void)
 
 	/* Test raster hit */
 	if (RasHitON) {
-		int raster_hit = (IO_VDC_REG[RCR].W & 0x3FF) - 64;
-		int current_line = scanline - IO_VDC_MINLINE + 1;
-		if (current_line == raster_hit && raster_hit < 263) {
-			TRACE_GFX("\n-----------------RASTER HIT (%d)------------------\n", scanline);
-			gfx_irq(VDC_STAT_RR);
+		if ( IO_VDC_REG[RCR].W >= 0x40 && (IO_VDC_REG[RCR].W <= 0x146))
+		{
+			uint16_t temp_rcr = (uint16_t)(IO_VDC_REG[RCR].W - 0x40);
+			if (scanline == (temp_rcr + IO_VDC_MINLINE) % 263)
+			{
+				TRACE_GFX("\n-----------------RASTER HIT (%d)------------------\n", scanline);
+				gfx_irq(VDC_STAT_RR);				
+			}
 		}
+
 	}
 
 	/* Visible area */
@@ -512,7 +516,7 @@ gfx_run(void)
 		gfx_context.latched = 0;
 		last_line_counter = 0;
 		line_counter = 0;
-		PCE.ScrollYDiff = 0;
+		PCE.ScrollYDiff = 0;		
 	}
 
 	/* Always call at least once (to handle pending IRQs) */

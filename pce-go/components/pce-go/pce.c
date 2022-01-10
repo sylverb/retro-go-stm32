@@ -38,7 +38,7 @@ pce_reset(bool hard)
     }
 
     PCE.SF2 = 0;
-
+    PCE.Timer.cycles_per_line = 113;
     Cycles = 0;
 
     // Reset sound generator values
@@ -248,7 +248,10 @@ pce_readIO(uint16_t A)
         break;
 
     case 0x0C00:                /* Timer */
-        ret = PCE.Timer.counter | (PCE.io_buffer & ~0x7F);
+        switch (A & 1) {
+        case 0: ret = PCE.Timer.counter | (PCE.io_buffer & ~0x7F); break;
+        case 1: ret = PCE.Timer.counter | (PCE.io_buffer & ~0x01); break;
+        }
         break;
 
     case 0x1000:                /* Joypad */
@@ -265,10 +268,10 @@ pce_readIO(uint16_t A)
     case 0x1400:                /* IRQ */
         switch (A & 3) {
         case 2:
-            ret = CPU.irq_mask | (PCE.io_buffer & ~INT_MASK);
+            ret = CPU.irq_mask | (PCE.io_buffer & ~0x03);
             break;
         case 3:
-            ret = CPU.irq_lines;
+            ret = CPU.irq_lines | (PCE.io_buffer & ~0x03);
             CPU.irq_lines = 0;
             break;
         }
@@ -420,7 +423,7 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case RCR:                           // Raster Compare Register
-                IO_VDC_REG_ACTIVE.B.h &= 0x03;
+                V &= 0x3FF;
                 break;
 
             case BXR:                           // Horizontal screen offset
@@ -432,6 +435,7 @@ pce_writeIO(uint16_t A, uint8_t V)
 
             case BYR:                           // Vertical screen offset
                 gfx_latch_context(0);
+                V &= 1;
                 PCE.ScrollYDiff = PCE.Scanline - 1 - IO_VDC_MINLINE;
                 if (PCE.ScrollYDiff < 0) {
                     MESSAGE_DEBUG("PCE.ScrollYDiff went negative when substraction VPR.h/.l (%d,%d)\n",
