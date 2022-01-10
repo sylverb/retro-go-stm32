@@ -268,10 +268,10 @@ pce_readIO(uint16_t A)
     case 0x1400:                /* IRQ */
         switch (A & 3) {
         case 2:
-            ret = CPU.irq_mask | (PCE.io_buffer & ~0x03);
+            ret = CPU.irq_mask | (PCE.io_buffer & ~INT_MASK);
             break;
         case 3:
-            ret = CPU.irq_lines | (PCE.io_buffer & ~0x03);
+            ret = CPU.irq_lines;
             CPU.irq_lines = 0;
             break;
         }
