@@ -116,7 +116,7 @@ pce_run(void)
         osd_input_read(PCE.Joypad.regs);
 
         for (PCE.Scanline = 0; PCE.Scanline < 263; ++PCE.Scanline) {
-            PCE.MaxCycles += CYCLES_PER_LINE;
+            PCE.MaxCycles += PCE.Timer.cycles_per_line;
             h6280_run();
             timer_run();
             gfx_run();
@@ -140,7 +140,7 @@ pce_run(void)
 static inline void
 timer_run(void)
 {
-	PCE.Timer.cycles_counter -= CYCLES_PER_LINE;
+	PCE.Timer.cycles_counter -= PCE.Timer.cycles_per_line;
 
 	// Trigger when it underflows
 	if (PCE.Timer.cycles_counter > CYCLES_PER_TIMER_TICK) {
