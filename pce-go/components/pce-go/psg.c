@@ -1,7 +1,10 @@
-// sound.c - Sound emulation
+// psg.c - Programmable Sound Generator
 //
-#include "sound.h"
+#include <stdlib.h>
+#include <string.h>
+#include "utils.h"
 #include "pce.h"
+#include "psg.h"
 
 static const uint8_t vol_tbl[32] = {
     100 >> 8, 451 >> 8, 508 >> 8, 573 >> 8, 646 >> 8, 728 >> 8, 821 >> 8, 925 >> 8,
@@ -10,21 +13,23 @@ static const uint8_t vol_tbl[32] = {
     7085 >> 8, 7986 >> 8, 9002 >> 8, 10148 >> 8, 11439 >> 8, 12894 >> 8, 14535 >> 8, 16384 >> 8
 };
 
-static uint32_t noise_rand[PSG_CHANNELS];
-static int32_t noise_level[PSG_CHANNELS];
 // The buffer should be signed but it seems to sound better
 // unsigned. I am still reviewing the implementation bellow.
-// static uint8_t mix_buffer[44100 / 60 * 2];
-static int16_t mix_buffer[44100 / 60 * 2];
+// In some games it also sounds better in 8 bit than in 16...
+// typedef uint8_t sample_t;
+typedef int16_t sample_t;
+
+static int samplerate = 22050;
+static int stereo = true;
 
 
 static inline void
-psg_update(int16_t *buf, int ch, size_t dwSize)
+psg_update_chan(sample_t *buf, int ch, size_t dwSize)
 {
     psg_chan_t *chan = &PCE.PSG.chan[ch];
     int sample = 0;
     uint32_t Tp;
-    typeof(buf) buf_end = buf + dwSize;
+    sample_t *buf_end = buf + dwSize;
 
     /*
     * This gives us a volume level of (0...15).
@@ -32,7 +37,7 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
     int lvol = (((chan->balance >> 4) * 1.1) * (chan->control & 0x1F)) / 32;
     int rvol = (((chan->balance & 0xF) * 1.1) * (chan->control & 0x1F)) / 32;
 
-    if (!host.sound.stereo) {
+    if (!stereo) {
         lvol = (lvol + rvol) / 2;
     }
 
@@ -50,7 +55,7 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
         // const int cycles_per_sample = CYCLES_PER_FRAME / (host.sound.sample_freq / 60);
 
         // float repeat = (float)elapsed / cycles_per_sample / chan->dda_count;
-        // printf("%.2f\n", repeat);
+        // MESSAGE_INFO("%.2f\n", repeat);
 
         int start = (int)chan->dda_index - chan->dda_count;
         if (start < 0)
@@ -72,7 +77,7 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
             for (int i = 0; i < repeat; i++) {
                 *buf++ = (sample * lvol);
 
-                if (host.sound.stereo) {
+                if (stereo) {
                     *buf++ = (sample * rvol);
                 }
             }
@@ -94,21 +99,21 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
         while (buf < buf_end) {
             chan->noise_accum += 3000 + Np * 512;
 
-            if ((Tp = (chan->noise_accum / host.sound.sample_freq)) >= 1) {
-                if (noise_rand[ch] & 0x00080000) {
-                    noise_rand[ch] = ((noise_rand[ch] ^ 0x0004) << 1) + 1;
-                    noise_level[ch] = -15;
+            if ((Tp = (chan->noise_accum / samplerate)) >= 1) {
+                if (chan->noise_rand & 0x00080000) {
+                    chan->noise_rand = ((chan->noise_rand ^ 0x0004) << 1) + 1;
+                    chan->noise_level = -15;
                 } else {
-                    noise_rand[ch] <<= 1;
-                    noise_level[ch] = 15;
+                    chan->noise_rand <<= 1;
+                    chan->noise_level = 15;
                 }
-                chan->noise_accum -= host.sound.sample_freq * Tp;
+                chan->noise_accum -= samplerate * Tp;
             }
 
-            *buf++ = (noise_level[ch] * lvol);
+            *buf++ = (chan->noise_level * lvol);
 
-            if (host.sound.stereo) {
-                *buf++ = (noise_level[ch] * rvol);
+            if (stereo) {
+                *buf++ = (chan->noise_level * rvol);
             }
         }
     }
@@ -124,16 +129,14 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
     else if ((Tp = chan->freq_lsb + (chan->freq_msb << 8)) > 0) {
         /*
          * Thank god for well commented code!  The original line of code read:
-         * fixed_inc = ((uint32_t) (3.2 * 1118608 / host.sound.freq) << 16) / Tp;
+         * fixed_inc = ((uint32_t) (3.2 * 1118608 / samplerate) << 16) / Tp;
          * and had nary a comment to be found.  It took a little head scratching to get
          * it figured out.  The 3.2 * 1118608 comes out to 3574595.6 which is obviously
          * meant to represent the 3.58mhz cpu clock speed used in the pc engine to
          * decrement the sound 'frequency'.  I haven't figured out why the original
          * author had the two numbers multiplied together to get the odd value instead of
          * just using 3580000.  I did some checking and the value will compute the same
-         * using either value divided by any standard soundcard samplerate.  The
-         * host.sound.freq is our soundcard's samplerate which is quite a bit slower than
-         * the pce's cpu (3580000 vs. 22050/44100 typically).
+         * using either value divided by any standard soundcard samplerate.
          *
          * Taken from the PSG doc written by Paul Clifford (paul@plasma.demon.co.uk)
          * <in reference to the 12 bit frequency value in PSG registers 2 and 3>
@@ -145,7 +148,7 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
          * sampling rate into consideration with regard to the 3580000 effective pc engine
          * samplerate.  We use 16.16 fixed arithmetic for speed.
          */
-        uint32_t fixed_inc = ((CLOCK_PSG / host.sound.sample_freq) << 16) / Tp;
+        uint32_t fixed_inc = ((CLOCK_PSG / samplerate) << 16) / Tp;
 
         while (buf < buf_end) {
             if ((sample = (chan->wave_data[chan->wave_index] - 16)) >= 0)
@@ -153,7 +156,7 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
 
             *buf++ = (sample * lvol);
 
-            if (host.sound.stereo) {
+            if (stereo) {
                 *buf++ = (sample * rvol);
             }
 
@@ -163,7 +166,6 @@ psg_update(int16_t *buf, int ch, size_t dwSize)
         }
     }
 
-pad_and_return:
     if (buf < buf_end) {
         memset(buf, 0, (void*)buf_end - (void*)buf);
     }
@@ -171,44 +173,52 @@ pad_and_return:
 
 
 int
-snd_init(void)
+psg_init(int _samplerate, bool _stereo)
 {
-    noise_rand[4] = 0x51F63101;
-    noise_rand[5] = 0x1F631042;
+    PCE.PSG.chan[4].noise_rand = 0x51F63101;
+    PCE.PSG.chan[5].noise_rand = 0x1F631042;
 
-    osd_snd_init();
+    samplerate = _samplerate;
+    stereo = _stereo;
 
     return 0;
 }
 
 
 void
-snd_term(void)
+psg_term(void)
 {
-    osd_snd_shutdown();
+    //
 }
 
 
 void
-snd_update(short *buffer, size_t length)
+psg_update(int16_t *output, size_t length, bool downsample)
 {
     int lvol = (PCE.PSG.volume >> 4);
     int rvol = (PCE.PSG.volume & 0x0F);
 
-    if (host.sound.stereo) {
+    if (stereo) {
         length *= 2;
     }
 
-    memset(buffer, 0, length * 2);
+    memset(output, 0, length * sizeof(int16_t));
 
     for (int i = 0; i < PSG_CHANNELS; i++)
     {
-        psg_update(mix_buffer, i, length);
+        sample_t mix_buffer[length + 1];
+        psg_update_chan(mix_buffer, i, length);
 
-        for (int j = 0; j < length; j += 2)
-        {
-            buffer[j] += mix_buffer[j] * lvol;
-            buffer[j + 1] += mix_buffer[j + 1] * rvol;
+        if (downsample) {
+            for (int j = 0; j < length; j += 2) {
+                output[j] += (uint8_t)mix_buffer[j] * lvol;
+                output[j + 1] += (uint8_t)mix_buffer[j + 1] * rvol;
+            }
+        } else {
+            for (int j = 0; j < length; j += 2) {
+                output[j] += mix_buffer[j] * lvol;
+                output[j + 1] += mix_buffer[j + 1] * rvol;
+            }
         }
     }
 }
