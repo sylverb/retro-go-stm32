@@ -56,14 +56,12 @@ static const UBYTE bcd2bin[0x100] = {
 #define zpindy_operand(x)  pce_read8(get_16bit_zp(imm_operand(x))+CPU.Y)
 
 // Flag check (flags 'N' and 'Z'):
-#define chk_flnz_8bit(x) CPU.P = ((CPU.P & (~(FL_N|FL_T|FL_Z))) | FL_B | FLAG_NZ(x));
+#define chk_flnz_8bit(x) CPU.P = ((CPU.P & (~(FL_N|FL_T|FL_Z))) | FLAG_NZ(x));
 
 // Zero page access
-//#define get_8bit_zp(zp_addr) (*(ZP_BASE + (zp_addr)))
 #define get_8bit_zp(zp_addr) ({UBYTE x = zp_addr; *((UBYTE *)(ZP_BASE + (x)));})
 //#define get_16bit_zp(zp_addr) ({UBYTE x = zp_addr; get_8bit_zp(x) | get_8bit_zp(x + 1) << 8;})
 #define get_16bit_zp(zp_addr) (*((UWORD *)(ZP_BASE + (zp_addr))))
-//#define put_8bit_zp(zp_addr, byte) (*(ZP_BASE + (zp_addr)) = (byte))
 #define put_8bit_zp(zp_addr, byte) ({UBYTE x = zp_addr; *(ZP_BASE + (x)) = (byte);})
 
 // Stack access
@@ -2178,7 +2176,7 @@ OPCODE_FUNC tai(void)
 
 OPCODE_FUNC csh(void) 
 {
-  PCE.Timer.cycles_per_line = 454; /* 21477270 / 3 / 60 / 263 */ /* 7.16 Mhz CPU clock */
+  PCE.Timer.cycles_per_line = 455; /* 21477270 / 3 / 60 / 263 */ /* 7.16 Mhz CPU clock */
   CPU.PC++;
   Cycles+=3;
 }
@@ -2446,15 +2444,15 @@ OPCODE_FUNC interrupt(int type)
 	push_8bit(CPU.P);
 	CPU.P &= ~(FL_D|FL_T);
 	CPU.P |= FL_I;
-	if (type & INT_IRQ1) {
+	if ( type & INT_TIMER ) {
+		CPU.irq_lines &= ~INT_TIMER;
+		CPU.PC = pce_read16(VEC_TIMER);
+	} else if (type & INT_IRQ1) {
 		CPU.irq_lines &= ~INT_IRQ1;
 		CPU.PC = pce_read16(VEC_IRQ1);
 	} else if (type & INT_IRQ2) {
 		CPU.irq_lines &= ~INT_IRQ2;
 		CPU.PC = pce_read16(VEC_IRQ2);
-	} else {
-		CPU.irq_lines &= ~INT_TIMER;
-		CPU.PC = pce_read16(VEC_TIMER);
 	}
-	Cycles += 7;
+	Cycles += 8;
 }

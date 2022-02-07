@@ -2,6 +2,9 @@
 
 #include "pce-go.h"
 
+#define EXPECT_UNLIKELY(n) __builtin_expect((n) != 0, 0)
+#define EXPECT_LIKELY(n) __builtin_expect((n) != 0, 1)
+
 // System clocks (hz)
 #define CLOCK_MASTER           (21477270)
 #define CLOCK_TIMER            (CLOCK_MASTER / 3)
@@ -127,10 +130,10 @@ typedef struct {
 	int ScrollYDiff;
 
 	// Number of executed CPU cycles
-	uint32_t Cycles;
+	int32_t Cycles;
 
 	// Run CPU until Cycles >= MaxCycles
-	uint32_t MaxCycles;
+	int32_t MaxCycles;
 
 	// Value of each of the MMR registers
 	uint8_t MMR[8];
@@ -148,10 +151,10 @@ typedef struct {
 	// Timer
 	struct {
 		uint16_t cycles_per_line;
-		uint16_t cycles_counter;
-		uint16_t counter;
-		uint16_t reload;
-		uint16_t running;
+		int32_t cycles_counter;
+		uint8_t counter;
+		uint8_t reload;
+		uint8_t running;
 	} Timer;
 
 	// Joypad
@@ -172,6 +175,7 @@ typedef struct {
 		UWord regs[32];			/* value of each VDC register */
 		uint8_t reg;			/* currently selected VDC register */
 		uint8_t status;			/* current VCD status (end of line, end of screen, ...) */
+		uint8_t vram;			/* VRAM DMA transfer status to happen in vblank */
 		uint8_t satb;			/* DMA transfer status to happen in vblank */
 		uint8_t mode_chg;       /* Video mode change needed at next frame */
 		uint32_t pending_irqs;	/* Pending VDC IRQs (we use it as a stack of 4bit events) */
@@ -214,6 +218,7 @@ extern uint8_t *PageW[8];
 // Interrupt enabled
 #define SATBIntON  (IO_VDC_REG[DCR].W & 0x01)
 #define DMAIntON   (IO_VDC_REG[DCR].W & 0x02)
+#define AutoSATBON (IO_VDC_REG[DCR].W & 0x10)
 #define SpHitON    (IO_VDC_REG[CR].W & 0x01)
 #define OverON     (IO_VDC_REG[CR].W & 0x02)
 #define RasHitON   (IO_VDC_REG[CR].W & 0x04)
@@ -245,25 +250,25 @@ uint8_t pce_readIO(uint16_t A);
 #if USE_MEM_MACROS
 
 #define pce_read8(addr) ({							\
-	uint32_t a = (addr);							\
+	uint16_t a = (addr);							\
 	uint8_t *page = PageR[a >> 13]; 				\
 	(page == PCE.IOAREA) ? pce_readIO(a) : page[a]; \
 })
 
 #define pce_write8(addr, byte) {					\
-	uint32_t a = (addr), b = (byte); 				\
+	uint16_t a = (addr), b = (byte); 				\
 	uint8_t *page = PageW[a >> 13]; 				\
 	if (page == PCE.IOAREA) pce_writeIO(a, b); 		\
 	else page[a] = b;							    \
 }
 
 #define pce_read16(addr) ({							\
-	uint32_t a = (addr); 							\
+	uint16_t a = (addr); 							\
 	*((uint16_t*)(PageR[a >> 13] + a));			    \
 })
 
 #define pce_write16(addr, word) {					\
-	uint32_t a = (addr), w = (word); 				\
+	uint16_t a = (addr), w = (word); 				\
 	*((uint16_t*)(PageR[a >> 13] + a)) = w;		    \
 }
 

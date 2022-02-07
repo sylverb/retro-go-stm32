@@ -420,14 +420,14 @@ gfx_irq(int type)
 	/* If IRQ, push it on the stack */
 	if (type >= 0) {
 		PCE.VDC.pending_irqs <<= 4;
-		PCE.VDC.pending_irqs |= type & 0xF;
+		PCE.VDC.pending_irqs |= (1+type) & 0xF;
 	}
 
 	/* Pop the first pending vdc interrupt only if CPU.irq_lines is clear */
 	int pos = 28;
 	while (!(CPU.irq_lines & INT_IRQ1) && PCE.VDC.pending_irqs) {
 		if (PCE.VDC.pending_irqs >> pos) {
-			PCE.VDC.status |= 1 << (PCE.VDC.pending_irqs >> pos);
+			PCE.VDC.status |= 1 << ((PCE.VDC.pending_irqs >> pos)-1);
 			PCE.VDC.pending_irqs &= ~(0xF << pos);
 			CPU.irq_lines |= INT_IRQ1; // Notify the CPU
 		}
@@ -458,7 +458,7 @@ gfx_run(void)
 		if ( IO_VDC_REG[RCR].W >= 0x40 && (IO_VDC_REG[RCR].W <= 0x146))
 		{
 			uint16_t temp_rcr = (uint16_t)(IO_VDC_REG[RCR].W - 0x40);
-			if (scanline == (temp_rcr + IO_VDC_MINLINE) % 263)
+			if (scanline == (temp_rcr + IO_VDC_MINLINE - 1) % 263)
 			{
 				TRACE_GFX("\n-----------------RASTER HIT (%d)------------------\n", scanline);
 				gfx_irq(VDC_STAT_RR);				
@@ -497,9 +497,26 @@ gfx_run(void)
 		}
 
 		/* VRAM to SATB DMA */
-		if (PCE.VDC.satb == DMA_TRANSFER_PENDING || IO_VDC_REG[DCR].W & 0x0010) {
+		if (PCE.VDC.satb == DMA_TRANSFER_PENDING || AutoSATBON) {
 			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
 			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
+		}
+
+		if (PCE.VDC.vram == DMA_TRANSFER_PENDING){
+			int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
+			int dst_inc = (IO_VDC_REG[DCR].W & 4) ? -1 : 1;
+
+			while (IO_VDC_REG[LENR].W != 0xFFFF) {
+				if (IO_VDC_REG[DISTR].W < 0x8000) {
+					PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
+				}
+				IO_VDC_REG[SOUR].W += src_inc;
+				IO_VDC_REG[DISTR].W += dst_inc;
+				IO_VDC_REG[LENR].W -= 1;
+			}
+			PCE.VDC.vram = 0;
+			if ( DMAIntON )
+				gfx_irq(VDC_STAT_DV);
 		}
 
 		/* Frame done, we can now process pending res change. */

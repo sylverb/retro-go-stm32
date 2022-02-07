@@ -16,8 +16,6 @@ uint8_t *PageW[8];
 
 static bool running = false;
 
-static inline void timer_run(void);
-
 /**
   * Reset the hardware
   **/
@@ -28,16 +26,19 @@ pce_reset(bool hard)
     memset(&PCE.VDC, 0, sizeof(PCE.VDC));
     memset(&PCE.PSG, 0, sizeof(PCE.PSG));
     memset(&PCE.Timer, 0, sizeof(PCE.Timer));
+    IO_VDC_REG[VPR].B.h=0x0f;
+    IO_VDC_REG[VPR].B.l=0x02;
 
     if (hard) {
         memset(&PCE.RAM, 0, sizeof(PCE.RAM));
         memset(&PCE.VRAM, 0, sizeof(PCE.VRAM));
         memset(&PCE.SPRAM, 0, sizeof(PCE.SPRAM));
         memset(&PCE.Palette, 0, sizeof(PCE.Palette));
-    memset(&PCE.NULLRAM, 0xFF, sizeof(PCE.NULLRAM));
+        memset(&PCE.NULLRAM, 0xFF, sizeof(PCE.NULLRAM));
     }
 
     PCE.SF2 = 0;
+    PCE.Timer.cycles_counter=CYCLES_PER_TIMER_TICK;
     PCE.Timer.cycles_per_line = 113;
     Cycles = 0;
 
@@ -116,9 +117,7 @@ pce_run(void)
         osd_input_read(PCE.Joypad.regs);
 
         for (PCE.Scanline = 0; PCE.Scanline < 263; ++PCE.Scanline) {
-            PCE.MaxCycles += PCE.Timer.cycles_per_line;
             h6280_run();
-            timer_run();
             gfx_run();
         }
 
@@ -126,34 +125,10 @@ pce_run(void)
         osd_vsync();
 
         // Prevent Overflowing
-        int trim = MIN(Cycles, PCE.MaxCycles);
-        PCE.MaxCycles -= trim;
-        Cycles -= trim;
+        PCE.Timer.cycles_counter -= Cycles;
+        PCE.MaxCycles -= Cycles;
+        Cycles = 0;
     }
-}
-
-
-/**
- * Functions to access PCE hardware
- **/
-
-static inline void
-timer_run(void)
-{
-	PCE.Timer.cycles_counter -= PCE.Timer.cycles_per_line;
-
-	// Trigger when it underflows
-	if (PCE.Timer.cycles_counter > CYCLES_PER_TIMER_TICK) {
-		PCE.Timer.cycles_counter += CYCLES_PER_TIMER_TICK;
-		if (PCE.Timer.running) {
-			// Trigger when it underflows from 0
-			if (PCE.Timer.counter > 0x7F) {
-				PCE.Timer.counter = PCE.Timer.reload;
-                CPU.irq_lines |= INT_TIMER;
-			}
-			PCE.Timer.counter--;
-		}
-	}
 }
 
 
@@ -198,6 +173,7 @@ pce_readIO(uint16_t A)
         case 0:
             ret = PCE.VDC.status;
             PCE.VDC.status = 0;
+            CPU.irq_lines &= ~INT_IRQ1;
             break;
         case 1:
             ret = 0;
@@ -248,9 +224,11 @@ pce_readIO(uint16_t A)
         break;
 
     case 0x0C00:                /* Timer */
-        switch (A & 1) {
-        case 0: ret = PCE.Timer.counter | (PCE.io_buffer & ~0x7F); break;
-        case 1: ret = PCE.Timer.counter | (PCE.io_buffer & ~0x01); break;
+        {
+            uint8_t tmp = PCE.Timer.counter;
+            if(PCE.Timer.cycles_counter == Cycles)
+                tmp = (tmp - 1) & 0x7F;
+            ret = (tmp | (PCE.io_buffer & 0x80)); 
         }
         break;
 
@@ -267,12 +245,13 @@ pce_readIO(uint16_t A)
 
     case 0x1400:                /* IRQ */
         switch (A & 3) {
+        case 1:
         case 2:
             ret = CPU.irq_mask | (PCE.io_buffer & ~INT_MASK);
             break;
         case 3:
-            ret = CPU.irq_lines;
-            CPU.irq_lines = 0;
+            ret = (CPU.irq_lines & INT_MASK) | (PCE.io_buffer & ~INT_MASK);
+            //CPU.irq_lines &= ~INT_TIMER;
             break;
         }
         break;
@@ -346,7 +325,8 @@ pce_writeIO(uint16_t A, uint8_t V)
                    if (IO_VDC_REG[BXR].B.l == V)
                    return;
                  */
-                gfx_latch_context(0);
+                if (IO_VDC_REG_ACTIVE.B.l != V)
+                    gfx_latch_context(0);
                 break;
 
             case BYR:                           // Vertical screen offset
@@ -362,6 +342,7 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case HSR:
+                V = 0x1F;
                 PCE.VDC.mode_chg = 1;
                 break;
 
@@ -371,6 +352,7 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case VPR:
+                V &= 0x1F;//continue below
             case VDW:
             case VCR:
                 PCE.VDC.mode_chg = 1;
@@ -389,6 +371,7 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case SATB:                          // DMA from VRAM to SATB
+                //PCE.VDC.satb = DMA_TRANSFER_PENDING;
                 break;
             }
             IO_VDC_REG_ACTIVE.B.l = V;
@@ -423,11 +406,11 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case RCR:                           // Raster Compare Register
-                V &= 0x3FF;
+                V &= 0x3;
                 break;
 
             case BXR:                           // Horizontal screen offset
-                V &= 3;
+                V &= 0x3;
                 if (IO_VDC_REG_ACTIVE.B.h != V) {
                     gfx_latch_context(0);
                 }
@@ -435,7 +418,7 @@ pce_writeIO(uint16_t A, uint8_t V)
 
             case BYR:                           // Vertical screen offset
                 gfx_latch_context(0);
-                V &= 1;
+                V &= 0x1;
                 PCE.ScrollYDiff = PCE.Scanline - 1 - IO_VDC_MINLINE;
                 if (PCE.ScrollYDiff < 0) {
                     MESSAGE_DEBUG("PCE.ScrollYDiff went negative when substraction VPR.h/.l (%d,%d)\n",
@@ -447,18 +430,26 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case HSR:
+                V &= 0x7F;
                 PCE.VDC.mode_chg = 1;
                 break;
 
             case HDR:                           // Horizontal Definition
+                V &= 0x7F;
                 TRACE_GFX2("VDC[HDR].h = %d\n", V);
                 break;
 
             case VPR:
-            case VDW:
-            case VCR:
+                V &= 0x7F;
                 PCE.VDC.mode_chg = 1;
                 break;
+            case VDW:
+                V &= 0x1;
+                PCE.VDC.mode_chg = 1;
+                break;
+            case VCR:
+                PCE.VDC.mode_chg = 1;
+                return;//not interested in the MSB of VCR
 
             case DCR:                           // DMA Control
                 break;
@@ -471,20 +462,7 @@ pce_writeIO(uint16_t A, uint8_t V)
 
             case LENR:                          // DMA transfer from VRAM to VRAM
                 IO_VDC_REG[LENR].B.h = V;
-
-                int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
-                int dst_inc = (IO_VDC_REG[DCR].W & 4) ? -1 : 1;
-
-                while (IO_VDC_REG[LENR].W != 0xFFFF) {
-                    if (IO_VDC_REG[DISTR].W < 0x8000) {
-                        PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
-                    }
-                    IO_VDC_REG[SOUR].W += src_inc;
-                    IO_VDC_REG[DISTR].W += dst_inc;
-                    IO_VDC_REG[LENR].W -= 1;
-                }
-
-                gfx_irq(VDC_STAT_DV);
+                PCE.VDC.vram = DMA_TRANSFER_PENDING;
                 return;
 
             case SATB:                          // DMA from VRAM to SATB
@@ -615,8 +593,10 @@ pce_writeIO(uint16_t A, uint8_t V)
             return;
         case 1:
             V &= 1;
-            if (V && !PCE.Timer.running)
+            if (V && !PCE.Timer.running){
+                PCE.Timer.cycles_counter = Cycles + CYCLES_PER_TIMER_TICK;
                 PCE.Timer.counter = PCE.Timer.reload;
+            }
             PCE.Timer.running = V;
             return;
         }

@@ -22,7 +22,7 @@
 #define SVAR_N(k, v, n) { n, k, &v }
 #define SVAR_END { 0, "\0\0\0\0", 0 }
 
-static const char SAVESTATE_HEADER[8] = "PCE_V005";
+static const char SAVESTATE_HEADER[8] = "PCE_V006";
 static const struct
 {
 	size_t len;
@@ -43,7 +43,8 @@ static const struct
 	SVAR_1("SF2", PCE.SF2),
 
 	// IRQ
-	SVAR_1("irq_mask", CPU.irq_mask),           SVAR_1("irq_lines", CPU.irq_lines),
+	SVAR_1("irq_mask", CPU.irq_mask),           SVAR_1("irq_mask_delay", CPU.irq_mask_delay),
+	SVAR_1("irq_lines", CPU.irq_lines),
 
 	// PSG
 	SVAR_1("psg.ch", PCE.PSG.ch),               SVAR_1("psg.vol", PCE.PSG.volume),
@@ -57,13 +58,13 @@ static const struct
 
 	// VDC
 	SVAR_A("vdc_regs", PCE.VDC.regs),           SVAR_1("vdc_reg", PCE.VDC.reg),
-	SVAR_1("vdc_status", PCE.VDC.status),       SVAR_1("vdc_satb", PCE.VDC.satb),
-	SVAR_4("vdc_pending_irqs", PCE.VDC.pending_irqs),
+	SVAR_1("vdc_status", PCE.VDC.status),       SVAR_1("vdc_satb", PCE.VDC.vram),
+	SVAR_1("vdc_satb", PCE.VDC.satb),			SVAR_4("vdc_pending_irqs", PCE.VDC.pending_irqs),
 
 	// Timer
-	SVAR_4("timer_reload", PCE.Timer.reload),   SVAR_4("timer_running", PCE.Timer.running),
-	SVAR_4("timer_counter", PCE.Timer.counter), SVAR_4("timer_next", PCE.Timer.cycles_counter),
-	SVAR_4("timer_freq", PCE.Timer.cycles_per_line),
+	SVAR_1("timer_reload", PCE.Timer.reload),   SVAR_1("timer_running", PCE.Timer.running),
+	SVAR_1("timer_counter", PCE.Timer.counter), SVAR_4("timer_next", PCE.Timer.cycles_counter),
+	SVAR_2("timer_freq", PCE.Timer.cycles_per_line),
 
 	SVAR_END
 };

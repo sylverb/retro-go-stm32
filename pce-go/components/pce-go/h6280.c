@@ -23,9 +23,10 @@ h6280_reset(void)
 {
     CPU.A = CPU.X = CPU.Y = 0x00;
     CPU.P = (FL_I|FL_B);
+	//CPU.P = FL_I;
     CPU.S = 0xFF;
     CPU.PC = pce_read16(VEC_RESET);
-	CPU.irq_mask = CPU.irq_lines = 0;
+	CPU.irq_mask = CPU.irq_mask_delay = CPU.irq_lines = 0;
 }
 
 
@@ -55,22 +56,27 @@ h6280_irq(int type)
 void
 h6280_run(void)
 {
-	int max_cycles = PCE.MaxCycles;
+	const int32_t max_cycles = PCE.MaxCycles + PCE.Timer.cycles_per_line;
+	PCE.MaxCycles = max_cycles;
 
 	/* Handle active block transfers, ie: do nothing. (tai/tdd/tia/tin/tii) */
-	if (Cycles > max_cycles) {
+	if (Cycles >= max_cycles) {
 		return;
 	}
 
-	/* Handle pending interrupts (Should be in the loop, but it's too slow) */
-	uint8_t irq = CPU.irq_lines & ~CPU.irq_mask & INT_MASK;
-	if ((CPU.P & FL_I) == 0 && irq) {
-		interrupt(irq);
-	}
-
 	/* Run for roughly one scanline */
-	while (Cycles < max_cycles)
+	while ( EXPECT_LIKELY(Cycles < max_cycles))
 	{
+		
+		/* Handle pending interrupts (Should be in the loop, but it's too slow) */
+		if ( CPU.irq_lines != 0 ) {
+			uint8_t irq = CPU.irq_lines & ~CPU.irq_mask_delay & INT_MASK;
+			if ((CPU.P & FL_I) == 0 && irq) {
+				interrupt(irq);
+			}
+		}
+		CPU.irq_mask_delay = CPU.irq_mask;
+
 		UBYTE opcode = imm_operand(CPU.PC);
 
 		TRACE_CPU("0x%4X: %s\n", CPU.PC, opcodes[opcode].name);
@@ -331,6 +337,19 @@ h6280_run(void)
 				// Illegal opcodes are treated as NOP
 				MESSAGE_DEBUG("Illegal opcode 0x%02X at pc=0x%04X!\n", opcode, CPU.PC);
 				nop();
+		}
+
+		while ( Cycles >= PCE.Timer.cycles_counter ){
+			PCE.Timer.cycles_counter += CYCLES_PER_TIMER_TICK;
+			if (PCE.Timer.running) {
+				PCE.Timer.counter--;
+				if (PCE.Timer.counter > 0x7F) {
+					PCE.Timer.counter = PCE.Timer.reload;
+					//if (!(CPU.irq_mask & INT_TIMER)) {
+						CPU.irq_lines |= INT_TIMER;
+					//}
+				}
+			}
 		}
 	}
 }
