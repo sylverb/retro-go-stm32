@@ -27,23 +27,23 @@
 #include <nes_mmc.h>
 
 /* mapper 11: Color Dreams, Wisdom Tree */
-static void map11_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
    UNUSED(address);
 
-   mmc_bankrom(32, 0x8000, value & 0x0F);
-   mmc_bankvrom(8, 0x0000, value >> 4);
+    mmc_bankrom(32, 0x8000, value & 0x0F);
+    mmc_bankvrom(8, 0x0000, value >> 4);
 }
 
-static void map11_init(void)
+static void map_init(void)
 {
-   mmc_bankrom(32, 0x8000, 0);
-   mmc_bankvrom(8, 0x0000, 0);
+    mmc_bankrom(32, 0x8000, 0);
+    mmc_bankvrom(8, 0x0000, 0);
 }
 
-static mem_write_handler_t map11_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map11_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -51,13 +51,13 @@ mapintf_t map11_intf =
 {
    11, /* mapper number */
    "Color Dreams", /* mapper name */
-   map11_init, /* init routine */
+   map_init, /* init routine */
    NULL, /* vblank callback */
    NULL, /* hblank callback */
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map11_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

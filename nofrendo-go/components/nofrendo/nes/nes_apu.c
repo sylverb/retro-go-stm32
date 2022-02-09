@@ -747,6 +747,7 @@ void apu_process(short *buffer, size_t num_samples, bool stereo)
       // Advance frame counter
       // apu_fc_advance(apu.cycle_rate);
    }
+
 }
 
 // Run for one frame
@@ -755,18 +756,6 @@ void apu_emulate(void)
    apu_process(apu.buffer, apu.samples_per_frame, apu.stereo);
 }
 
-void apu_reset(void)
-{
-   /* initialize all channel members */
-   for (uint32 addr = 0x4000; addr <= 0x4013; addr++)
-      apu_write(addr, 0);
-
-   apu_write(0x4015, 0x00);
-   apu_write(0x4017, 0x80); // nesdev wiki says this should be 0, but it seems to work better disabled
-
-   if (apu.ext && apu.ext->reset)
-      apu.ext->reset();
-}
 
 void apu_setopt(apu_option_t n, int val)
 {
@@ -783,6 +772,18 @@ void apu_setopt(apu_option_t n, int val)
 int apu_getopt(apu_option_t n)
 {
    return apu.options[n];
+}
+void apu_reset(void)
+{
+   /* initialize all channel members */
+   for (uint32 addr = 0x4000; addr <= 0x4013; addr++)
+      apu_write(addr, 0);
+
+   apu_write(0x4015, 0x00);
+   apu_write(0x4017, 0x80); // nesdev wiki says this should be 0, but it seems to work better disabled
+
+   if (apu.ext && apu.ext->reset)
+      apu.ext->reset();
 }
 
 /* Initializes emulated sound hardware, creates waveforms/voices */

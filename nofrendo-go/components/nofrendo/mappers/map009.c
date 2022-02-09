@@ -31,15 +31,6 @@
 static uint8 latch[2];
 static uint8 regs[4];
 
-// Shouldn't that be packed? (It wasn't packed in SNSS...)
-typedef struct
-{
-   unsigned char latch[2];
-   unsigned char lastB000Write;
-   unsigned char lastC000Write;
-   unsigned char lastD000Write;
-   unsigned char lastE000Write;
-} mapper9Data;
 
 /* Used when tile $FD/$FE is accessed */
 static void mmc9_latchfunc(uint32 address, uint8 value)
@@ -65,51 +56,70 @@ static void mmc9_latchfunc(uint32 address, uint8 value)
 
 /* mapper 9: MMC2 */
 /* MMC2: Punch-Out! */
-static void map9_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
-   switch ((address & 0xF000) >> 12)
-   {
-   case 0xA:
-      mmc_bankrom(8, 0x8000, value);
-      break;
+    switch ((address & 0xF000) >> 12)
+    {
+    case 0xA:
+        mmc_bankrom(8, 0x8000, value);
+        break;
 
-   case 0xB:
-      regs[0] = value;
-      if (0xFD == latch[0])
-         mmc_bankvrom(4, 0x0000, value);
-      break;
+    case 0xB:
+        regs[0] = value;
+        if (0xFD == latch[0])
+            mmc_bankvrom(4, 0x0000, value);
+        break;
 
-   case 0xC:
-      regs[1] = value;
-      if (0xFE == latch[0])
-         mmc_bankvrom(4, 0x0000, value);
-      break;
+    case 0xC:
+        regs[1] = value;
+        if (0xFE == latch[0])
+            mmc_bankvrom(4, 0x0000, value);
+        break;
 
-   case 0xD:
-      regs[2] = value;
-      if (0xFD == latch[1])
-         mmc_bankvrom(4, 0x1000, value);
-      break;
+    case 0xD:
+        regs[2] = value;
+        if (0xFD == latch[1])
+            mmc_bankvrom(4, 0x1000, value);
+        break;
 
-   case 0xE:
-      regs[3] = value;
-      if (0xFE == latch[1])
-         mmc_bankvrom(4, 0x1000, value);
-      break;
+    case 0xE:
+        regs[3] = value;
+        if (0xFE == latch[1])
+            mmc_bankvrom(4, 0x1000, value);
+        break;
 
-   case 0xF:
-      if (value & 1)
-         ppu_setmirroring(PPU_MIRROR_HORI);
-      else
-         ppu_setmirroring(PPU_MIRROR_VERT);
-      break;
+    case 0xF:
+        if (value & 1)
+            ppu_setmirroring(PPU_MIRROR_HORI);
+        else
+            ppu_setmirroring(PPU_MIRROR_VERT);
+        break;
 
-   default:
-      break;
-   }
+    default:
+        break;
+    }
 }
 
-static void map9_init(void)
+static void map_getstate(uint8 *state)
+{
+    state[0] = latch[0];
+    state[1] = latch[1];
+    state[2] = regs[0];
+    state[3] = regs[1];
+    state[4] = regs[2];
+    state[5] = regs[3];
+}
+
+static void map_setstate(uint8 *state)
+{
+    latch[0] = state[0];
+    latch[1] = state[1];
+    regs[0]  = state[2];
+    regs[1]  = state[3];
+    regs[2]  = state[4];
+    regs[3]  = state[5];
+}
+static void map_init(void)
 {
    memset(regs, 0, sizeof(regs));
 
@@ -124,29 +134,11 @@ static void map9_init(void)
    ppu_setlatchfunc(mmc9_latchfunc);
 }
 
-static void map9_getstate(void *state)
-{
-   ((mapper9Data*)state)->latch[0] = latch[0];
-   ((mapper9Data*)state)->latch[1] = latch[1];
-   ((mapper9Data*)state)->lastB000Write = regs[0];
-   ((mapper9Data*)state)->lastC000Write = regs[1];
-   ((mapper9Data*)state)->lastD000Write = regs[2];
-   ((mapper9Data*)state)->lastE000Write = regs[3];
-}
 
-static void map9_setstate(void *state)
-{
-   latch[0] = ((mapper9Data*)state)->latch[0];
-   latch[1] = ((mapper9Data*)state)->latch[1];
-   regs[0]  = ((mapper9Data*)state)->lastB000Write;
-   regs[1]  = ((mapper9Data*)state)->lastC000Write;
-   regs[2]  = ((mapper9Data*)state)->lastD000Write;
-   regs[3]  = ((mapper9Data*)state)->lastE000Write;
-}
 
-static mem_write_handler_t map9_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map9_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -154,13 +146,13 @@ mapintf_t map9_intf =
 {
    9, /* mapper number */
    "MMC2", /* mapper name */
-   map9_init, /* init routine */
+   map_init, /* init routine */
    NULL, /* vblank callback */
    NULL, /* hblank callback */
-   map9_getstate, /* get state (snss) */
-   map9_setstate, /* set state (snss) */
+   map_getstate, /* get state (snss) */
+   map_setstate, /* set state (snss) */
    NULL, /* memory read structure */
-   map9_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

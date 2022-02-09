@@ -17,38 +17,37 @@
 ** must bear this legend.
 **
 **
-** map7.c
+** map030.c: UNROM-512 mapper interface
 **
-** mapper 7 interface
-** $Id: map007.c,v 1.2 2001/04/27 14:37:11 neil Exp $
 */
 
 #include <nofrendo.h>
 #include <nes_mmc.h>
-#include <nes_ppu.h>
 
-static bool is_battletoads = 0;
+static bool switchable_screen = false;
 
-/* mapper 7: AOROM */
+
 static void map_write(uint32 address, uint8 value)
 {
-    mmc_bankrom(32, 0x8000, value & 0xF);
+    if (switchable_screen)
+    {
+        ppu_setmirroring(PPU_MIRROR_SCR0 + (value >> 7));
+    }
 
-    if (value & 0x10)
-       // ppu_setmirroring(PPU_MIRROR_SCR1);
-       ppu_setnametables(1, is_battletoads ? 0 : 1, 1, 1);
-    else
-       ppu_setmirroring(PPU_MIRROR_SCR0);
+    mmc_bankrom(16, 0x8000, value & 0x1F);
+    mmc_bankvrom(8, 0x0000, (value >> 5) & 0x03);
 }
 
 static void map_init(void)
 {
-    is_battletoads = (nes_getptr()->rominfo->checksum == 0x279710DC);
+    // if (cart->mirroring == PPU_MIRROR_FOUR)
+    // {
+    //     ppu_setmirroring(PPU_MIRROR_SCR0);
+    //     switchable_screen = true;
+    // }
 
-    if (is_battletoads)
-       MESSAGE_INFO("Enabled Battletoads mirroring hack\n");
-
-    map_write(0x8000, 0);
+    mmc_bankrom(16, 0x8000, 0);
+    mmc_bankrom(16, 0xC000, MMC_LASTBANK);
 }
 
 static mem_write_handler_t map_memwrite[] =
@@ -57,16 +56,15 @@ static mem_write_handler_t map_memwrite[] =
    LAST_MEMORY_HANDLER
 };
 
-mapintf_t map7_intf =
+mapintf_t map30_intf =
 {
-   7, /* mapper number */
-   "AOROM", /* mapper name */
-   map_init, /* init routine */
-   NULL, /* vblank callback */
-   NULL, /* hblank callback */
-   NULL, /* get state (snss) */
-   NULL, /* set state (snss) */
-   NULL, /* memory read structure */
-   map_memwrite, /* memory write structure */
-   NULL /* external sound device */
+    .number     = 30,
+    .name       = "UNROM-512",
+    .init       = map_init,
+    .vblank     = NULL,
+    .hblank     = NULL,
+    .get_state  = NULL,
+    .set_state  = NULL,
+    .mem_write  = map_memwrite,
+	NULL
 };

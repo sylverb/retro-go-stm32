@@ -30,11 +30,15 @@
 #include <osd.h>
 
 #define  ROM_INES_MAGIC       "NES\x1A"
+#define ROM_NSF_MAGIC         "NESM\x1A"
+#define ROM_FDS_MAGIC         "FDS\x1A"
+#define ROM_FDS_RAW_MAGIC     "\x01*NINTENDO-HVC*"
 
 #define  ROM_FLAG_FOURSCREEN  0x08
 #define  ROM_FLAG_TRAINER     0x04
 #define  ROM_FLAG_BATTERY     0x02
 #define  ROM_FLAG_VERTICAL    0x01
+#define  ROM_FLAG_FDS_DISK    0x200
 
 // non-ines flags
 #define  ROM_FLAG_VERSUS      0x100
@@ -57,6 +61,13 @@ typedef struct inesheader_s
    uint32 reserved1       ;
    uint32 reserved2       ;
 } inesheader_t;
+
+typedef struct __attribute__((packed))
+{
+   uint8 magic[4];
+   uint8 sides;
+   uint8 reserved[11];
+} fdsheader_t;
 
 typedef struct rominfo_s
 {

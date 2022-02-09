@@ -29,25 +29,14 @@
 #include <nes_mmc.h>
 #include <nes.h>
 
-/******************************************/
-/* Mapper #87 write handler ($6000-$7FFF) */
-/******************************************/
-static void map87_write (uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
-  /* Within range, address written to is irrelevant */
-  UNUSED (address);
-
-  /* Very simple: 8K CHR page is selected by D1 */
-  if (value & 0x02) mmc_bankvrom (8, 0x0000, 0x01);
-  else              mmc_bankvrom (8, 0x0000, 0x00);
-
-  /* Done */
-  return;
+    mmc_bankvrom(8, 0x0000, (value & 3) >> 1);
 }
 
-static mem_write_handler_t map87_memwrite [] =
+static mem_write_handler_t map_memwrite [] =
 {
-   { 0x6000, 0x7FFF, map87_write },
+   { 0x6000, 0x7FFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -61,7 +50,7 @@ mapintf_t map87_intf =
    NULL,                             /* Get state (SNSS) */
    NULL,                             /* Set state (SNSS) */
    NULL,                             /* Memory read structure */
-   map87_memwrite,                   /* Memory write structure */
+   map_memwrite,                   /* Memory write structure */
    NULL                              /* External sound device */
 };
 

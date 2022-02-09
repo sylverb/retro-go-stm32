@@ -40,7 +40,6 @@ static mem_t *mem;
 #define ADD_CYCLES(x) \
 { \
    remaining_cycles -= (x); \
-   cpu.total_cycles += (x); \
 }
 
 /*
@@ -170,7 +169,7 @@ static mem_t *mem;
 }
 
 /* Zero-page indexed Y */
-/* Not really an adressing mode, just for LDx/STx */
+/* Not really an addressing mode, just for LDx/STx */
 #define ZP_IND_Y_ADDR(address) \
 { \
    ZERO_PAGE_ADDR(address); \
@@ -319,6 +318,16 @@ static mem_t *mem;
    PUSH(COMBINE_FLAGS()); \
    i_flag = 1; \
    JUMP(IRQ_VECTOR); \
+}
+
+#define PENDING_IRQ_PROC() \
+{ \
+   if (0 == i_flag && cpu.int_pending && remaining_cycles > 0) \
+   { \
+      cpu.int_pending = 0; \
+      IRQ_PROC(); \
+      ADD_CYCLES(INT_CYCLES); \
+   } \
 }
 
 /*
@@ -484,12 +493,7 @@ static mem_t *mem;
 { \
    i_flag = 0; \
    ADD_CYCLES(2); \
-   if (cpu.int_pending && remaining_cycles > 0) \
-   { \
-      cpu.int_pending = 0; \
-      IRQ_PROC(); \
-      ADD_CYCLES(INT_CYCLES); \
-   } \
+   PENDING_IRQ_PROC(); \
 }
 
 #define CLV() \
@@ -819,12 +823,7 @@ static mem_t *mem;
    PC = PULL(); \
    PC |= PULL() << 8; \
    ADD_CYCLES(6); \
-   if (0 == i_flag && cpu.int_pending && remaining_cycles > 0) \
-   { \
-      cpu.int_pending = 0; \
-      IRQ_PROC(); \
-      ADD_CYCLES(INT_CYCLES); \
-   } \
+   PENDING_IRQ_PROC(); \
 }
 
 #define RTS() \
@@ -1062,7 +1061,7 @@ static mem_t *mem;
 #define readbyte(a) mem_getbyte(a)
 
 /*
-** Middle man for faster albeit unsafe/innacurate/unchecked memory access.
+** Middle man for faster albeit unsafe/inaccurate/unchecked memory access.
 ** Used only when address = PC, which is always a valid ROM access (in theory)
 */
 
@@ -1131,12 +1130,10 @@ IRAM_ATTR uint32 nes6502_getcycles()
 /* Execute instructions until count expires
 **
 ** Returns the number of cycles *actually* executed, which will be
-** anywhere from zero to timeslice_cycles + 6
+** anywhere from zero to cycles + 6
 */
-IRAM_ATTR int nes6502_execute(int timeslice_cycles)
+IRAM_ATTR int nes6502_execute(int cycles)
 {
-   int old_cycles = cpu.total_cycles;
-
    uint32 temp, addr; /* for macros */
    uint8 btemp, baddr; /* for macros */
    uint8 data;
@@ -1184,7 +1181,7 @@ IRAM_ATTR int nes6502_execute(int timeslice_cycles)
 
 #endif /* NES6502_JUMPTABLE */
 
-   remaining_cycles = timeslice_cycles;
+   long remaining_cycles = cycles;
 
    /* check for DMA cycle burning */
    if (cpu.burn_cycles && remaining_cycles > 0)
@@ -1194,12 +1191,7 @@ IRAM_ATTR int nes6502_execute(int timeslice_cycles)
       cpu.burn_cycles -= burn_for;
    }
 
-   if (0 == i_flag && cpu.int_pending && remaining_cycles > 0)
-   {
-      cpu.int_pending = 0;
-      IRQ_PROC();
-      ADD_CYCLES(INT_CYCLES);
-   }
+   PENDING_IRQ_PROC();
 
    /* Continue until we run out of cycles */
    while (remaining_cycles > 0)
@@ -1279,6 +1271,7 @@ IRAM_ATTR int nes6502_execute(int timeslice_cycles)
       OPCODE(0x41, EOR(6, INDIR_X_BYTE));                           /* EOR ($nn,X) */
       OPCODE(0x42, JAM());                                          /* JAM */
       OPCODE(0x43, SRE(8, INDIR_X, writebyte, addr));               /* SRE ($nn,X) */
+      OPCODE(0x44, DOP(3));                                         /* NOP $nn */
       OPCODE(0x45, EOR(3, ZERO_PAGE_BYTE));                         /* EOR $nn */
       OPCODE(0x46, LSR(5, ZERO_PAGE, ZP_WRITEBYTE, baddr));         /* LSR $nn */
       OPCODE(0x47, SRE(5, ZERO_PAGE, ZP_WRITEBYTE, baddr));         /* SRE $nn */
@@ -1295,8 +1288,8 @@ IRAM_ATTR int nes6502_execute(int timeslice_cycles)
       OPCODE(0x51, EOR(5, INDIR_Y_BYTE_READ));                      /* EOR ($nn),Y */
       OPCODE(0x52, JAM());                                          /* JAM */
       OPCODE(0x53, SRE(8, INDIR_Y, writebyte, addr));               /* SRE ($nn),Y */
-      OPCODE(0x55, EOR(4, ZP_IND_X_BYTE));                          /* EOR $nn,X */
       OPCODE(0x54, DOP(4));                                         /* NOP $nn,X */
+      OPCODE(0x55, EOR(4, ZP_IND_X_BYTE));                          /* EOR $nn,X */
       OPCODE(0x56, LSR(6, ZP_IND_X, ZP_WRITEBYTE, baddr));          /* LSR $nn,X */
       OPCODE(0x57, SRE(6, ZP_IND_X, ZP_WRITEBYTE, baddr));          /* SRE $nn,X */
       OPCODE(0x58, CLI());                                          /* CLI */
@@ -1312,7 +1305,6 @@ IRAM_ATTR int nes6502_execute(int timeslice_cycles)
       OPCODE(0x61, ADC(6, INDIR_X_BYTE));                           /* ADC ($nn,X) */
       OPCODE(0x62, JAM());                                          /* JAM */
       OPCODE(0x63, RRA(8, INDIR_X, writebyte, addr));               /* RRA ($nn,X) */
-      OPCODE(0x44, DOP(3));                                         /* NOP $nn */
       OPCODE(0x64, DOP(3));                                         /* NOP $nn */
       OPCODE(0x65, ADC(3, ZERO_PAGE_BYTE));                         /* ADC $nn */
       OPCODE(0x66, ROR(5, ZERO_PAGE, ZP_WRITEBYTE, baddr));         /* ROR $nn */
@@ -1485,52 +1477,48 @@ IRAM_ATTR int nes6502_execute(int timeslice_cycles)
    STORE_LOCAL_REGS();
 
    /* Return our actual amount of executed cycles */
-   return (cpu.total_cycles - old_cycles);
-}
+   cycles -= remaining_cycles; // remaining_cycles can be negative, which is fine
+   cpu.total_cycles += cycles;
 
-/* Issue a CPU Reset */
-void nes6502_reset(void)
-{
-   cpu.p_reg = Z_FLAG | R_FLAG | I_FLAG;  /* Reserved bit always 1 */
-   cpu.pc_reg = readword(RESET_VECTOR);   /* Fetch reset vector */
-   cpu.int_pending = false;               /* No pending interrupts */
-   cpu.jammed = false;
-   cpu.burn_cycles = RESET_CYCLES;
+   return cycles;
 }
 
 /* Non-maskable interrupt */
 IRAM_ATTR void nes6502_nmi(void)
 {
-   DECLARE_LOCAL_REGS();
+   if (cpu.jammed)
+      return;
 
-   if (false == cpu.jammed)
-   {
-      GET_GLOBAL_REGS();
-      NMI_PROC();
-      cpu.burn_cycles += INT_CYCLES;
-      STORE_LOCAL_REGS();
-   }
+   DECLARE_LOCAL_REGS();
+   GET_GLOBAL_REGS();
+   NMI_PROC();
+   STORE_LOCAL_REGS();
+   cpu.burn_cycles += INT_CYCLES;
 }
 
 /* Interrupt request */
 IRAM_ATTR void nes6502_irq(void)
 {
-   DECLARE_LOCAL_REGS();
+   if (cpu.jammed)
+      return;
 
-   if (false == cpu.jammed)
+   if (cpu.p_reg & I_FLAG)
    {
-      GET_GLOBAL_REGS();
-      if (0 == i_flag)
-      {
-         IRQ_PROC();
-         cpu.burn_cycles += INT_CYCLES;
-      }
-      else
-      {
-         cpu.int_pending = 1;
-      }
-      STORE_LOCAL_REGS();
+      cpu.int_pending = 1;
    }
+   else
+   {
+      DECLARE_LOCAL_REGS();
+      GET_GLOBAL_REGS();
+      IRQ_PROC();
+      STORE_LOCAL_REGS();
+      cpu.burn_cycles += INT_CYCLES;
+   }
+}
+
+IRAM_ATTR void nes6502_irq_clear(void)
+{
+   cpu.p_reg &= I_FLAG;
 }
 
 /* Set dead cycle period */
@@ -1544,6 +1532,16 @@ IRAM_ATTR void nes6502_release(void)
 {
    remaining_cycles = 0;
 }
+/* Issue a CPU Reset */
+void nes6502_reset(void)
+{
+   cpu.p_reg = Z_FLAG | R_FLAG | I_FLAG;  /* Reserved bit always 1 */
+   cpu.pc_reg = readword(RESET_VECTOR);   /* Fetch reset vector */
+   cpu.int_pending = false;               /* No pending interrupts */
+   cpu.jammed = false;
+   cpu.burn_cycles = RESET_CYCLES;
+}
+
 
 /* Create a nes6502 object */
 nes6502_t *nes6502_init(mem_t *_mem)

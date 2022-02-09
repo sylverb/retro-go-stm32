@@ -17,56 +17,46 @@
 ** must bear this legend.
 **
 **
-** map7.c
+** map071.c: Clone of 002 (UNROM) for Codemasters/Camerica games
 **
-** mapper 7 interface
-** $Id: map007.c,v 1.2 2001/04/27 14:37:11 neil Exp $
 */
 
 #include <nofrendo.h>
 #include <nes_mmc.h>
-#include <nes_ppu.h>
 
-static bool is_battletoads = 0;
 
-/* mapper 7: AOROM */
 static void map_write(uint32 address, uint8 value)
 {
-    mmc_bankrom(32, 0x8000, value & 0xF);
-
-    if (value & 0x10)
-       // ppu_setmirroring(PPU_MIRROR_SCR1);
-       ppu_setnametables(1, is_battletoads ? 0 : 1, 1, 1);
+    // SCR0/1 mirroring only used by Fire Hawk
+    if ((address & 0xF000) == 0x9000)
+        ppu_setmirroring((value & 4) ? PPU_MIRROR_SCR1 : PPU_MIRROR_SCR0);
     else
-       ppu_setmirroring(PPU_MIRROR_SCR0);
+        mmc_bankrom(16, 0x8000, value);
 }
 
 static void map_init(void)
 {
-    is_battletoads = (nes_getptr()->rominfo->checksum == 0x279710DC);
-
-    if (is_battletoads)
-       MESSAGE_INFO("Enabled Battletoads mirroring hack\n");
-
-    map_write(0x8000, 0);
+    mmc_bankrom(16, 0xc000, MMC_LASTBANK);
+    mmc_bankrom(16, 0x8000, 0);
 }
 
 static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map_write },
-   LAST_MEMORY_HANDLER
+    { 0x8000, 0xFFFF, map_write },
+    LAST_MEMORY_HANDLER
 };
 
-mapintf_t map7_intf =
+
+mapintf_t map71_intf =
 {
-   7, /* mapper number */
-   "AOROM", /* mapper name */
-   map_init, /* init routine */
-   NULL, /* vblank callback */
-   NULL, /* hblank callback */
-   NULL, /* get state (snss) */
-   NULL, /* set state (snss) */
-   NULL, /* memory read structure */
-   map_memwrite, /* memory write structure */
-   NULL /* external sound device */
+    .number     = 71,
+    .name       = "Mapper 71",
+    .init       = map_init,
+    .vblank     = NULL,
+    .hblank     = NULL,
+    .get_state  = NULL,
+    .set_state  = NULL,
+    .mem_read   = NULL,
+    .mem_write  = map_memwrite,
+	NULL
 };

@@ -17,32 +17,28 @@
 ** must bear this legend.
 **
 **
-** map93.c
+** map093.c: Mapper 93 interface
 **
-** mapper 93 interface
-** $Id: map093.c,v 1.2 2001/04/27 14:37:11 neil Exp $
 */
 
 #include <nofrendo.h>
 #include <nes_mmc.h>
 #include <nes_ppu.h>
 
-static void map93_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
-   UNUSED(address);
+    /* ($8000-$FFFF) D7-D4 = switch $8000-$BFFF D0: mirror */
+    mmc_bankrom(16, 0x8000, value >> 4);
 
-   /* ($8000-$FFFF) D7-D4 = switch $8000-$BFFF D0: mirror */
-   mmc_bankrom(16, 0x8000, value >> 4);
-
-   if (value & 1)
-      ppu_setmirroring(PPU_MIRROR_VERT);
-   else
-      ppu_setmirroring(PPU_MIRROR_HORI);
+    if (value & 1)
+        ppu_setmirroring(PPU_MIRROR_VERT);
+    else
+        ppu_setmirroring(PPU_MIRROR_HORI);
 }
 
-static mem_write_handler_t map93_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map93_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -56,7 +52,7 @@ mapintf_t map93_intf =
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map93_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

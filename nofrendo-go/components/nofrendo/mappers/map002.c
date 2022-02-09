@@ -27,22 +27,25 @@
 #include <nes_mmc.h>
 
 /* mapper 2: UNROM */
-static void map2_init()
-{
-    mmc_bankrom(16, 0xc000, MMC_LASTBANK);
-    mmc_bankrom(16, 0x8000, 0);
-}
 
-static void map2_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
    UNUSED(address);
 
    mmc_bankrom(16, 0x8000, value);
 }
 
-static mem_write_handler_t map2_memwrite[] =
+static void map_init()
 {
-   { 0x8000, 0xFFFF, map2_write },
+    mmc_bankrom(16, 0x8000, 0);
+    mmc_bankrom(16, 0xC000, MMC_LASTBANK);
+}
+
+
+
+static mem_write_handler_t map_memwrite[] =
+{
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -50,13 +53,13 @@ mapintf_t map2_intf =
 {
    2, /* mapper number */
    "UNROM", /* mapper name */
-   map2_init, /* init routine */
+   map_init, /* init routine */
    NULL, /* vblank callback */
    NULL, /* hblank callback */
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map2_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

@@ -58,6 +58,103 @@ void mmc_getcontext(mmc_t *dest_mmc)
    *dest_mmc = mmc;
 }
 
+/* PRG-ROM/RAM bankswitching */
+void mmc_bankprg(int size, uint32 address, int bank, uint8 *base)
+{
+   size_t banks = 16;
+
+   // if (base == PRG_ANY)
+   //    base = cart->prg_rom ? PRG_ROM : PRG_RAM;
+
+   if (base == PRG_ROM)
+   {
+      base = mmc_getinfo()->rom;
+      banks = mmc_getinfo()->rom_banks;
+   }
+   else if (base == PRG_RAM)
+   {
+      base = mmc_getinfo()->sram;
+      banks = mmc_getinfo()->sram_banks;
+   }
+
+   if (base == NULL)
+   {
+      MESSAGE_ERROR("MMC: Invalid pointer! Addr: $%04X Bank: %d Size: %d\n", address, bank, size);
+      abort();
+   }
+
+   switch (size)
+   {
+   case 8:
+      base += ((bank >= 0 ? bank : (banks) + bank) % (banks)) << 13;
+      break;
+
+   case 16:
+      base += ((bank >= 0 ? bank : (banks / 2) + bank) % (banks / 2)) << 14;
+      break;
+
+   case 32:
+      base += ((bank >= 0 ? bank : (banks / 4) + bank) % (banks / 4)) << 15;
+      break;
+
+   default:
+      MESSAGE_ERROR("MMC: Invalid bank size! Addr: $%04X Bank: %d Size: %d\n", address, bank, size);
+      abort();
+   }
+
+   for (int i = 0; i < (size * 0x400 / MEM_PAGESIZE); i++)
+   {
+      mem_setpage((address >> MEM_PAGESHIFT) + i, base + i * MEM_PAGESIZE);
+   }
+}
+
+/* CHR-ROM/RAM bankswitching */
+void mmc_bankchr(int size, uint32 address, int bank, uint8 *base)
+{
+   size_t banks = 128;
+
+   if (base == CHR_ANY)
+      base = mmc_getinfo()->vrom_banks ? CHR_ROM : CHR_RAM;
+
+   if (base == CHR_ROM)
+   {
+      base = mmc_getinfo()->vrom;
+      banks = mmc_getinfo()->vrom_banks;
+   }
+   else if (base == CHR_RAM)
+   {
+      base = mmc_getinfo()->vram;
+      banks = mmc_getinfo()->vram_banks;
+   }
+
+   switch (size)
+   {
+   case 1:
+      bank = (bank >= 0 ? bank : (banks * 8) + bank) % (banks * 8);
+      ppu_setpage(1, address >> 10, &base[bank << 10] - address);
+      break;
+
+   case 2:
+      bank = (bank >= 0 ? bank : (banks * 4) + bank) % (banks * 4);
+      ppu_setpage(2, address >> 10, &base[bank << 11] - address);
+      break;
+
+   case 4:
+      bank = (bank >= 0 ? bank : (banks * 2) + bank) % (banks * 2);
+      ppu_setpage(4, address >> 10, &base[bank << 12] - address);
+      break;
+
+   case 8:
+      bank = (bank >= 0 ? bank : (banks) + bank) % (banks);
+      ppu_setpage(8, 0, &base[bank << 13]);
+      break;
+
+   default:
+      MESSAGE_ERROR("MMC: Invalid CHR bank size %d\n", size);
+      abort();
+   }
+}
+
 /* Map a pointer into the address space */
 void mmc_bankptr(int size, uint32 address, int bank, uint8 *ptr)
 {

@@ -38,6 +38,15 @@ static uint16 vrombase;
 
 
 /* mapper 4: MMC3 */
+static void mmc3_bankchr(int size, uint32 address, int bank)
+{
+    if (bank & 0x80) {
+       mmc_bankchr(size, address, bank & 0x07, CHR_RAM);
+    } else {
+       mmc_bankchr(size, address, bank, CHR_ROM);
+    }
+}
+
 static void map_write(uint32 address, uint8 value)
 {
     switch (address & 0xE001)
@@ -53,30 +62,28 @@ static void map_write(uint32 address, uint8 value)
         {
         case 0:
             value &= 0xFE;
-            mmc_bankvrom(1, vrombase ^ 0x0000, value);
-            mmc_bankvrom(1, vrombase ^ 0x0400, value + 1);
+            mmc3_bankchr(1, vrombase ^ 0x0000, value);
+            mmc3_bankchr(1, vrombase ^ 0x0400, value + 1);
             break;
-
         case 1:
             value &= 0xFE;
-            mmc_bankvrom(1, vrombase ^ 0x0800, value);
-            mmc_bankvrom(1, vrombase ^ 0x0C00, value + 1);
+            mmc3_bankchr(1, vrombase ^ 0x0800, value);
+            mmc3_bankchr(1, vrombase ^ 0x0C00, value + 1);
             break;
-
         case 2:
-            mmc_bankvrom(1, vrombase ^ 0x1000, value);
+            mmc3_bankchr(1, vrombase ^ 0x1000, value);
             break;
 
         case 3:
-            mmc_bankvrom(1, vrombase ^ 0x1400, value);
+            mmc3_bankchr(1, vrombase ^ 0x1400, value);
             break;
 
         case 4:
-            mmc_bankvrom(1, vrombase ^ 0x1800, value);
+            mmc3_bankchr(1, vrombase ^ 0x1800, value);
             break;
 
         case 5:
-            mmc_bankvrom(1, vrombase ^ 0x1C00, value);
+            mmc3_bankchr(1, vrombase ^ 0x1C00, value);
             break;
 
         case 6:
@@ -171,10 +178,10 @@ static mem_write_handler_t map_memwrite[] =
    LAST_MEMORY_HANDLER
 };
 
-mapintf_t map4_intf =
+mapintf_t map191_intf =
 {
-   4, /* mapper number */
-   "MMC3", /* mapper name */
+   191, /* mapper number */
+   "TQ-ROM(MMC3 Clone)", /* mapper name */
    map_init, /* init routine */
    NULL, /* vblank callback */
    map_hblank, /* hblank callback */

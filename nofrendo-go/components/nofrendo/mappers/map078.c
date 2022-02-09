@@ -27,37 +27,35 @@
 #include <nes_mmc.h>
 #include <nes_ppu.h>
 
-/* mapper 78: Holy Diver, Cosmo Carrier */
+
 /* ($8000-$FFFF) D2-D0 = switch $8000-$BFFF */
 /* ($8000-$FFFF) D7-D4 = switch PPU $0000-$1FFF */
 /* ($8000-$FFFF) D3 = switch mirroring */
-static void map78_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
-   UNUSED(address);
+    mmc_bankrom(16, 0x8000, value & 7);
+    mmc_bankvrom(8, 0x0000, (value >> 4) & 0x0F);
 
-   mmc_bankrom(16, 0x8000, value & 7);
-   mmc_bankvrom(8, 0x0000, (value >> 4) & 0x0F);
-
-   /* Ugh! Same abuse of the 4-screen bit as with Mapper #70 */
-   if (mmc_getinfo()->flags & ROM_FLAG_FOURSCREEN)
-   {
-      if (value & 0x08)
-         ppu_setmirroring(PPU_MIRROR_VERT);
-      else
-         ppu_setmirroring(PPU_MIRROR_HORI);
-   }
-   else
-   {
-      if ((value >> 3) & 1)
-         ppu_setmirroring(PPU_MIRROR_SCR1);
-      else
-         ppu_setmirroring(PPU_MIRROR_SCR0);
-   }
+    /* Ugh! Same abuse of the 4-screen bit as with Mapper #70 */
+    if (mmc_getinfo()->flags & ROM_FLAG_FOURSCREEN)
+    {
+        if (value & 0x08)
+            ppu_setmirroring(PPU_MIRROR_VERT);
+        else
+            ppu_setmirroring(PPU_MIRROR_HORI);
+    }
+    else
+    {
+        if ((value >> 3) & 1)
+            ppu_setmirroring(PPU_MIRROR_SCR1);
+        else
+            ppu_setmirroring(PPU_MIRROR_SCR0);
+    }
 }
 
-static mem_write_handler_t map78_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map78_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -71,7 +69,7 @@ mapintf_t map78_intf =
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map78_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

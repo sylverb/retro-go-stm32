@@ -18,11 +18,13 @@ extern mapintf_t map15_intf;
 extern mapintf_t map16_intf;
 extern mapintf_t map18_intf;
 extern mapintf_t map19_intf;
+extern mapintf_t map20_intf;
 extern mapintf_t map21_intf;
 extern mapintf_t map22_intf;
 extern mapintf_t map23_intf;
 extern mapintf_t map24_intf;
 extern mapintf_t map25_intf;
+extern mapintf_t map30_intf;
 extern mapintf_t map32_intf;
 extern mapintf_t map33_intf;
 extern mapintf_t map34_intf;
@@ -35,21 +37,33 @@ extern mapintf_t map64_intf;
 extern mapintf_t map65_intf;
 extern mapintf_t map66_intf;
 extern mapintf_t map70_intf;
+extern mapintf_t map71_intf;
 extern mapintf_t map73_intf;
+extern mapintf_t map74_intf;
 extern mapintf_t map75_intf;
+extern mapintf_t map76_intf;
 extern mapintf_t map78_intf;
 extern mapintf_t map79_intf;
 extern mapintf_t map85_intf;
 extern mapintf_t map87_intf;
 extern mapintf_t map93_intf;
 extern mapintf_t map94_intf;
+extern mapintf_t map119_intf;
 extern mapintf_t map160_intf;
 extern mapintf_t map162_intf;
 extern mapintf_t map163_intf;
+extern mapintf_t map185_intf;
+extern mapintf_t map191_intf;
+extern mapintf_t map192_intf;
 extern mapintf_t map193_intf;
+extern mapintf_t map194_intf;
+extern mapintf_t map195_intf;
+extern mapintf_t map206_intf;
 extern mapintf_t map228_intf;
 extern mapintf_t map229_intf;
 extern mapintf_t map231_intf;
+extern mapintf_t map252_intf;
+extern mapintf_t map253_intf;
 
 /* implemented mapper interfaces */
 static const mapintf_t *mappers[] =
@@ -69,11 +83,13 @@ static const mapintf_t *mappers[] =
     &map16_intf,
     &map18_intf,
     &map19_intf,
+    &map20_intf,
     &map21_intf,
     &map22_intf,
     &map23_intf,
     &map24_intf,
     &map25_intf,
+    &map30_intf,
     &map32_intf,
     &map33_intf,
     &map34_intf,
@@ -86,20 +102,32 @@ static const mapintf_t *mappers[] =
     &map65_intf,
     &map66_intf,
     &map70_intf,
+    &map71_intf,
     &map73_intf,
+    &map74_intf,
     &map75_intf,
+    &map76_intf,
     &map78_intf,
     &map79_intf,
     &map85_intf,
     &map87_intf,
     &map93_intf,
     &map94_intf,
+    &map119_intf,
     &map160_intf,
     &map162_intf,
     &map163_intf,
+    &map185_intf,
+    &map191_intf,
+    &map192_intf,
     &map193_intf,
+    &map194_intf,
+    &map195_intf,
+    &map206_intf,
     &map228_intf,
     &map229_intf,
     &map231_intf,
+    &map252_intf,
+    &map253_intf,
     NULL
 };
