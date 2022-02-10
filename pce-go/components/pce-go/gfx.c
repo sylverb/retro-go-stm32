@@ -520,7 +520,7 @@ gfx_run(void)
 		}
 
 		/* Frame done, we can now process pending res change. */
-		if (PCE.VDC.mode_chg && IO_VDC_REG[VCR].W != 0) {
+		if (PCE.VDC.mode_chg) {
 			TRACE_GFX("Changing mode: VDS = %04x VSW = %04x VDW = %04x VCR = %04x\n",
 				IO_VDC_REG[VPR].B.h, IO_VDC_REG[VPR].B.l,
 				IO_VDC_REG[VDW].W, IO_VDC_REG[VCR].W);
