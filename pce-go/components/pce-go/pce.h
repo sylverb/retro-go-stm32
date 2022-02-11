@@ -226,6 +226,7 @@ extern uint8_t *PageW[8];
 
 #define SpriteON   (IO_VDC_REG[CR].W & 0x40)
 #define ScreenON   (IO_VDC_REG[CR].W & 0x80)
+#define BurstMode  (IO_VDC_REG[CR].W & 0x0C)
 
 #define DMA_TRANSFER_COUNTER 0x80
 #define DMA_TRANSFER_PENDING 0x40

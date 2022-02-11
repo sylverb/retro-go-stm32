@@ -203,7 +203,13 @@ pce_readIO(uint16_t A)
         case 2: ret = 0xFF; break; // Write only
         case 3: ret = 0xFF; break; // Write only
         case 4: ret = PCE.VCE.regs[PCE.VCE.reg.W].B.l; break; // Color LSB (8 bit)
-        case 5: ret = PCE.VCE.regs[PCE.VCE.reg.W++].B.h | 0xFE; break; // Color MSB (1 bit)
+        case 5: {            
+                //printf("READ VCE Color MSB\n");
+                ret = (PCE.VCE.regs[PCE.VCE.reg.W].B.h & 1) | 0xFE; // Color MSB (1 bit)
+                PCE.VCE.reg.W++;
+                PCE.VCE.reg.W &= 0x1FF;
+                break; 
+        }
         case 6: ret = 0xFF; break; // Unused
         }
         break;
@@ -352,7 +358,9 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
 
             case VPR:
-                V &= 0x1F;//continue below
+                V &= 0x1F;
+                PCE.VDC.mode_chg = 1;
+		        break;
             case VDW:
             case VCR:
                 PCE.VDC.mode_chg = 1;
