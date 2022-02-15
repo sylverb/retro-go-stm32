@@ -354,13 +354,15 @@ pce_writeIO(uint16_t A, uint8_t V)
 
             case HDR:                           // Horizontal Definition
                 V &= 0x7F;
-                PCE.VDC.mode_chg = 1;
+                if ( (V + 1) * 8 != IO_VDC_SCREEN_WIDTH) {
+                    PCE.VDC.mode_chg = 1;
+                }
                 break;
 
             case VPR:
                 V &= 0x1F;
                 PCE.VDC.mode_chg = 1;
-		        break;
+                break;
             case VDW:
             case VCR:
                 PCE.VDC.mode_chg = 1;
@@ -397,6 +399,23 @@ pce_writeIO(uint16_t A, uint8_t V)
             case VWR:                           // VRAM Write Register
                 // I am not 100% sure if MAWR should wrap instead, eg IO_VDC_REG[MAWR].W & 0x7FFF
                 if (IO_VDC_REG[MAWR].W < 0x8000) {
+                    if ( PCE.VDC.vram == DMA_TRANSFER_PENDING ){
+                        int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
+                        int dst_inc = (IO_VDC_REG[DCR].W & 4) ? -1 : 1;
+                        while (IO_VDC_REG[LENR].W != 0xFFFF) {                        
+                            if (IO_VDC_REG[DISTR].W < 0x8000) {
+                                PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
+                            }
+                            IO_VDC_REG[SOUR].W += src_inc;
+                            IO_VDC_REG[DISTR].W += dst_inc;
+                            IO_VDC_REG[LENR].W -= 1;                            
+                        }
+                        //PCE.VDC.status &= 0x3F;//remove busy DMA
+                        PCE.VDC.vram = 0;
+                        if (DMAIntON)//generate the interrupt when requested
+                            gfx_irq(VDC_STAT_DV);					
+                    }
+
                     PCE.VRAM[IO_VDC_REG[MAWR].W] = (V << 8) | IO_VDC_REG_ACTIVE.B.l;
                 }
                 IO_VDC_REG_INC(MAWR);
@@ -457,7 +476,7 @@ pce_writeIO(uint16_t A, uint8_t V)
                 break;
             case VCR:
                 PCE.VDC.mode_chg = 1;
-                return;//not interested in the MSB of VCR
+                break;
 
             case DCR:                           // DMA Control
                 break;
