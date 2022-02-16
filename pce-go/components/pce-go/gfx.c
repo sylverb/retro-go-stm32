@@ -505,18 +505,20 @@ gfx_run(void)
 		if (PCE.VDC.vram == DMA_TRANSFER_PENDING){
 			int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
 			int dst_inc = (IO_VDC_REG[DCR].W & 4) ? -1 : 1;
-
-			while (IO_VDC_REG[LENR].W != 0xFFFF) {
+		    for(int i = 0; i < 455; i++) {//do DMA for approx 1 scanline
 				if (IO_VDC_REG[DISTR].W < 0x8000) {
 					PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
 				}
 				IO_VDC_REG[SOUR].W += src_inc;
 				IO_VDC_REG[DISTR].W += dst_inc;
 				IO_VDC_REG[LENR].W -= 1;
-			}
-			PCE.VDC.vram = 0;
-			if ( DMAIntON )
-				gfx_irq(VDC_STAT_DV);
+				if (IO_VDC_REG[LENR].W == 0xFFFF) {
+					PCE.VDC.vram = 0;
+					if (DMAIntON)//generate the interrupt when requested
+						gfx_irq(VDC_STAT_DV);
+					break;
+				}
+			 }
 		}
 
 		/* Frame done, we can now process pending res change. */
