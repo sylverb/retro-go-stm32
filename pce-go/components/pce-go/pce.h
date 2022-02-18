@@ -147,6 +147,7 @@ typedef struct {
 
 	// Remanence latch
 	uint8_t io_buffer;
+	uint16_t VBlankFL;
 
 	// Timer
 	struct {
@@ -166,6 +167,8 @@ typedef struct {
 
 	// Video Color Encoder
 	struct {
+		uint8_t CR;				/* VCE Control */
+		uint8_t dot_clock;		/* Dot Clock(5, 7, or 10 MHz = 0, 1, 2) */
 		UWord regs[0x200];		/* palette info */
 		UWord reg;				/* currently selected color */
 	} VCE;
@@ -214,6 +217,12 @@ extern uint8_t *PageW[8];
 #define IO_VDC_MAXLINE       (IO_VDC_MINLINE + IO_VDC_REG[VDW].W)
 #define IO_VDC_SCREEN_WIDTH  ((IO_VDC_REG[HDR].B.l + 1) * 8)
 #define IO_VDC_SCREEN_HEIGHT (IO_VDC_REG[VDW].W + 1)
+#define M_vdc_HSW (IO_VDC_REG[HSR].B.l & 0x1F) // Horizontal Synchro Width
+#define M_vdc_HDS (IO_VDC_REG[HSR].B.h & 0x7F) // Horizontal Display Start
+#define M_vdc_HDW (IO_VDC_REG[HDR].B.l & 0x7F) // Horizontal Display Width
+#define M_vdc_HDE (IO_VDC_REG[HDR].B.h & 0x7F) // Horizontal Display End
+
+
 
 // Interrupt enabled
 #define SATBIntON  (IO_VDC_REG[DCR].W & 0x01)

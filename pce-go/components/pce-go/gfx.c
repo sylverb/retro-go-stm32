@@ -443,22 +443,36 @@ void
 gfx_run(void)
 {
 	int scanline = PCE.Scanline;
+	bool need_vbi = false;
 
-	/* DMA Transfer in "progress" */
-	if (PCE.VDC.satb > DMA_TRANSFER_COUNTER) {
-		if (--PCE.VDC.satb == DMA_TRANSFER_COUNTER) {
-			if (SATBIntON) {
-				gfx_irq(VDC_STAT_DS);
-			}
+    if (scanline == 0)
+	{
+		PCE.VBlankFL = IO_VDC_MAXLINE + 1;
+   		if(PCE.VBlankFL > 261)
+    		PCE.VBlankFL = 261;
+
+	}
+
+
+	if( scanline == PCE.VBlankFL ){
+		if (VBlankON) {
+			need_vbi = true;
+		}
+		/* VRAM to SATB DMA */
+		if ( PCE.VDC.satb == DMA_TRANSFER_PENDING || AutoSATBON ) {
+			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
+			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
 		}
 	}
+
+
 
 	/* Test raster hit */
 	if (RasHitON) {
 		if ( IO_VDC_REG[RCR].W >= 0x40 && (IO_VDC_REG[RCR].W <= 0x146))
 		{
 			uint16_t temp_rcr = (uint16_t)(IO_VDC_REG[RCR].W - 0x40);
-			if (scanline == (temp_rcr + IO_VDC_MINLINE - 1) % 263)
+			if (scanline == (temp_rcr + IO_VDC_MINLINE) % 263)
 			{
 				TRACE_GFX("\n-----------------RASTER HIT (%d)------------------\n", scanline);
 				gfx_irq(VDC_STAT_RR);				
@@ -466,6 +480,25 @@ gfx_run(void)
 		}
 
 	}
+
+	int32_t line_leadin1 = 0;
+	int32_t magical = M_vdc_HDS + (M_vdc_HDW + 1) + M_vdc_HDE;
+	magical = (magical + 2) & ~1;
+	magical -= M_vdc_HDW + 1;
+	int32_t cyc_tot = magical * 8; 
+	cyc_tot-=2;
+	switch(PCE.VCE.dot_clock)
+	{
+		case 0: cyc_tot = 4 * cyc_tot / 3; break;
+		case 1: break;
+		case 2: cyc_tot = 2 * cyc_tot / 3; break;
+	}
+
+	if(cyc_tot < 0) cyc_tot = 0;
+	line_leadin1 = cyc_tot;
+
+
+	h6280_run(line_leadin1);
 
 	/* Visible area */
 	if (scanline >= 14 && scanline <= 255) {
@@ -492,15 +525,8 @@ gfx_run(void)
 		if (SpHitON && sprite_hit_check()) {
 			gfx_irq(VDC_STAT_CR);
 		}
-		if (VBlankON) {
-			gfx_irq(VDC_STAT_VD);
-		}
 
-		/* VRAM to SATB DMA */
-		if (PCE.VDC.satb == DMA_TRANSFER_PENDING || AutoSATBON) {
-			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
-			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
-		}
+
 
 		if (PCE.VDC.vram == DMA_TRANSFER_PENDING){
 			int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
@@ -538,6 +564,29 @@ gfx_run(void)
 		PCE.ScrollYDiff = 0;		
 	}
 
+	if ( need_vbi ){
+		PCE.VDC.status |= 1 << VDC_STAT_VD;
+	}
+
+	h6280_run(2);
+
+	if ( IO_VDC_STATUS(VDC_STAT_VD) ){
+		CPU.irq_lines |= INT_IRQ1;
+	}
+	
+	h6280_run(PCE.Timer.cycles_per_line - 82 - 2);
+
+	/* DMA Transfer in "progress" */
+	if (PCE.VDC.satb > DMA_TRANSFER_COUNTER) {
+		if (--PCE.VDC.satb == DMA_TRANSFER_COUNTER) {
+			PCE.VDC.satb = 0;
+			if (SATBIntON) {
+				gfx_irq(VDC_STAT_DS);
+			}
+		}
+	}
+
+
 	/* Always call at least once (to handle pending IRQs) */
-	gfx_irq(-1);
+	//gfx_irq(-1);
 }
