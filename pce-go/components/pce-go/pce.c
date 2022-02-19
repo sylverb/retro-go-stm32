@@ -29,6 +29,8 @@ pce_reset(bool hard)
     IO_VDC_REG[VPR].B.h=0x0f;
     IO_VDC_REG[VPR].B.l=0x02;
 
+    IO_VDC_REG[HSR].W = IO_VDC_REG[HDR].W = IO_VDC_REG[VPR].W = IO_VDC_REG[VDW].W = IO_VDC_REG[VCR].W = 0xFF;
+
     if (hard) {
         memset(&PCE.RAM, 0, sizeof(PCE.RAM));
         memset(&PCE.VRAM, 0, sizeof(PCE.VRAM));
@@ -117,7 +119,6 @@ pce_run(void)
         osd_input_read(PCE.Joypad.regs);
 
         for (PCE.Scanline = 0; PCE.Scanline < 263; ++PCE.Scanline) {
-            h6280_run();
             gfx_run();
         }
 
@@ -177,6 +178,8 @@ pce_readIO(uint16_t A)
             break;
         case 1:
             ret = 0;
+            if(PCE.VCE.dot_clock > 0)
+                ret = 0x40;
             break;
         case 2:
             if (PCE.VDC.reg == VRR) {             // // VRAM Read Register (LSB)
@@ -189,6 +192,7 @@ pce_readIO(uint16_t A)
             if (PCE.VDC.reg == VRR) {            // VRAM Read Register (MSB)
                 ret = PCE.VRAM[IO_VDC_REG[MARR].W & 0x7FFF] >> 8;
                 IO_VDC_REG_INC(MARR);
+                PCE.io_buffer = PCE.VRAM[IO_VDC_REG[MARR].W & 0x7FFF];
             } else {
                 ret = IO_VDC_REG_ACTIVE.B.h;
             }
@@ -251,7 +255,10 @@ pce_readIO(uint16_t A)
 
     case 0x1400:                /* IRQ */
         switch (A & 3) {
+        case 0:    
         case 1:
+            ret = PCE.io_buffer;
+            break;
         case 2:
             ret = CPU.irq_mask | (PCE.io_buffer & ~INT_MASK);
             break;
@@ -505,6 +512,10 @@ pce_writeIO(uint16_t A, uint8_t V)
     case 0x0400:                /* VCE */
         switch (A & 7) {
         case 0:                                 // VCE control
+            PCE.VCE.CR = V;
+            PCE.VCE.dot_clock = V & 1;
+            if(V & 2)
+               PCE.VCE.dot_clock = 2;
             return;
 
         case 1:                                 // Not used
