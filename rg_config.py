@@ -16,6 +16,5 @@ PROJECT_APPS = {
   'gnuboy-go':    [18,  458752],
   'smsplusgx-go': [19,  524288],
   'pce-go':       [20,  327680],
-  'handy-go':     [21,  458752],
-  'snes':         [22,  524288],
+  'handy-go':     [21,  458752]
 }
