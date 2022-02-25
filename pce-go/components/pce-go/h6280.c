@@ -23,7 +23,6 @@ h6280_reset(void)
 {
     CPU_PCE.A = CPU_PCE.X = CPU_PCE.Y = 0x00;
     CPU_PCE.P = (FL_I|FL_B);
-	//CPU_PCE.P = FL_I;
     CPU_PCE.S = 0xFF;
     CPU_PCE.PC = pce_read16(VEC_RESET);
 	CPU_PCE.irq_mask = CPU_PCE.irq_mask_delay = CPU_PCE.irq_lines = 0;
