@@ -59,7 +59,7 @@ pce_reset(bool hard)
     pce_bank_set(1, 0xF8);
     pce_bank_set(0, 0xFF);
 
-    // Reset CPU
+    // Reset CPU_PCE
     h6280_reset();
 }
 
@@ -174,7 +174,7 @@ pce_readIO(uint16_t A)
         case 0:
             ret = PCE.VDC.status;
             PCE.VDC.status = 0;
-            CPU.irq_lines &= ~INT_IRQ1;
+            CPU_PCE.irq_lines &= ~INT_IRQ1;
             break;
         case 1:
             ret = 0;
@@ -260,11 +260,11 @@ pce_readIO(uint16_t A)
             ret = PCE.io_buffer;
             break;
         case 2:
-            ret = CPU.irq_mask | (PCE.io_buffer & ~INT_MASK);
+            ret = CPU_PCE.irq_mask | (PCE.io_buffer & ~INT_MASK);
             break;
         case 3:
-            ret = (CPU.irq_lines & INT_MASK) | (PCE.io_buffer & ~INT_MASK);
-            //CPU.irq_lines &= ~INT_TIMER;
+            ret = (CPU_PCE.irq_lines & INT_MASK) | (PCE.io_buffer & ~INT_MASK);
+            //CPU_PCE.irq_lines &= ~INT_TIMER;
             break;
         }
         break;
@@ -649,10 +649,10 @@ pce_writeIO(uint16_t A, uint8_t V)
     case 0x1400:                /* IRQ */
         switch (A & 3) {
         case 2:
-            CPU.irq_mask = V & INT_MASK;
+            CPU_PCE.irq_mask = V & INT_MASK;
             return;
         case 3:
-            CPU.irq_lines &= ~INT_TIMER;
+            CPU_PCE.irq_lines &= ~INT_TIMER;
             return;
         }
         break;
@@ -670,5 +670,5 @@ pce_writeIO(uint16_t A, uint8_t V)
         return;
     }
 
-    MESSAGE_DEBUG("ignored I/O write: %04x,%02x at PC = %04X\n", A, V, CPU.PC);
+    MESSAGE_DEBUG("ignored I/O write: %04x,%02x at PC = %04X\n", A, V, CPU_PCE.PC);
 }

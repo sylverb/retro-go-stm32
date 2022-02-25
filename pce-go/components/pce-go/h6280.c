@@ -1,4 +1,4 @@
-//  h6280.c - CPU Emulation
+//  h6280.c - CPU_PCE Emulation
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,21 +12,20 @@
 
 #define OPCODE(n, f) case n: f; break;
 
-h6280_t CPU;
+h6280_t CPU_PCE;
 
 
 /**
- * Reset CPU
+ * Reset CPU_PCE
  **/
 void
 h6280_reset(void)
 {
-    CPU.A = CPU.X = CPU.Y = 0x00;
-    CPU.P = (FL_I|FL_B);
-	//CPU.P = FL_I;
-    CPU.S = 0xFF;
-    CPU.PC = pce_read16(VEC_RESET);
-	CPU.irq_mask = CPU.irq_mask_delay = CPU.irq_lines = 0;
+    CPU_PCE.A = CPU_PCE.X = CPU_PCE.Y = 0x00;
+    CPU_PCE.P = (FL_I|FL_B);
+    CPU_PCE.S = 0xFF;
+    CPU_PCE.PC = pce_read16(VEC_RESET);
+	CPU_PCE.irq_mask = CPU_PCE.irq_mask_delay = CPU_PCE.irq_lines = 0;
 }
 
 
@@ -51,7 +50,7 @@ h6280_irq(int type)
 
 
 /**
- * CPU emulation
+ * CPU_PCE emulation
  **/
 void
 h6280_run(int32_t cycles)
@@ -74,18 +73,18 @@ h6280_run(int32_t cycles)
 		while ( EXPECT_LIKELY(Cycles < next_event )) {
 				
 			/* Handle pending interrupts (Should be in the loop, but it's too slow) */
-			if ( CPU.irq_lines != 0 ) {
-				uint8_t irq = CPU.irq_lines & ~CPU.irq_mask_delay & INT_MASK;
-				if ((CPU.P & FL_I) == 0 && irq) {
+			if ( CPU_PCE.irq_lines != 0 ) {
+				uint8_t irq = CPU_PCE.irq_lines & ~CPU_PCE.irq_mask_delay & INT_MASK;
+				if ((CPU_PCE.P & FL_I) == 0 && irq) {
 					interrupt(irq);
 					continue;
 				}
 			}
-			CPU.irq_mask_delay = CPU.irq_mask;
+			CPU_PCE.irq_mask_delay = CPU_PCE.irq_mask;
 
-			UBYTE opcode = imm_operand(CPU.PC);
+			UBYTE opcode = imm_operand(CPU_PCE.PC);
 
-			TRACE_CPU("0x%4X: %s\n", CPU.PC, opcodes[opcode].name);
+			TRACE_CPU("0x%4X: %s\n", CPU_PCE.PC, opcodes[opcode].name);
 
 			switch (opcode)
 			{
@@ -341,7 +340,7 @@ h6280_run(int32_t cycles)
 
 				default:
 					// Illegal opcodes are treated as NOP
-					MESSAGE_DEBUG("Illegal opcode 0x%02X at pc=0x%04X!\n", opcode, CPU.PC);
+					MESSAGE_DEBUG("Illegal opcode 0x%02X at pc=0x%04X!\n", opcode, CPU_PCE.PC);
 					nop();
 			}
 		} 
@@ -352,7 +351,7 @@ h6280_run(int32_t cycles)
 				PCE.Timer.counter--;
 				if (PCE.Timer.counter > 0x7F) {
 					PCE.Timer.counter = PCE.Timer.reload;
-					CPU.irq_lines |= INT_TIMER;
+					CPU_PCE.irq_lines |= INT_TIMER;
 				}
 			}
 		}
