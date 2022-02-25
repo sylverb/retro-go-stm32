@@ -423,13 +423,13 @@ gfx_irq(int type)
 		PCE.VDC.pending_irqs |= (1+type) & 0xF;
 	}
 
-	/* Pop the first pending vdc interrupt only if CPU.irq_lines is clear */
+	/* Pop the first pending vdc interrupt only if CPU_PCE.irq_lines is clear */
 	int pos = 28;
-	while (!(CPU.irq_lines & INT_IRQ1) && PCE.VDC.pending_irqs) {
+	while (!(CPU_PCE.irq_lines & INT_IRQ1) && PCE.VDC.pending_irqs) {
 		if (PCE.VDC.pending_irqs >> pos) {
 			PCE.VDC.status |= 1 << ((PCE.VDC.pending_irqs >> pos)-1);
 			PCE.VDC.pending_irqs &= ~(0xF << pos);
-			CPU.irq_lines |= INT_IRQ1; // Notify the CPU
+			CPU_PCE.irq_lines |= INT_IRQ1; // Notify the CPU_PCE
 		}
 		pos -= 4;
 	}
@@ -571,7 +571,7 @@ gfx_run(void)
 	h6280_run(2);
 
 	if ( IO_VDC_STATUS(VDC_STAT_VD) ){
-		CPU.irq_lines |= INT_IRQ1;
+		CPU_PCE.irq_lines |= INT_IRQ1;
 	}
 	
 	h6280_run(PCE.Timer.cycles_per_line - 82 - 2);
