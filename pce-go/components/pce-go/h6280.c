@@ -14,7 +14,6 @@
 
 h6280_t CPU_PCE;
 
-
 /**
  * Reset CPU_PCE
  **/
