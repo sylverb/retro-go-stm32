@@ -34,9 +34,6 @@ struct odroid_dialog_choice {
 
 #define ODROID_DIALOG_CHOICE_LAST {0x0F0F0F0F, "LAST", "LAST", 0xFFFF, NULL}
 
-extern char* ODROID_DIALOG_VALUE_ON;
-extern char* ODROID_DIALOG_VALUE_OFF;
-
 extern odroid_menu_state_t odroid_menu_state;
 
 void odroid_overlay_init();
