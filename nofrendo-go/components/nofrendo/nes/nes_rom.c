@@ -96,34 +96,54 @@ static int rom_getheader(unsigned char **rom, rominfo_t *rominfo)
 	memcpy(&head, *rom, sizeof(head));
 	*rom += sizeof(head);
 
-   if (memcmp(head.ines_magic, ROM_INES_MAGIC, 4))
+   if (! memcmp(head.ines_magic, ROM_INES_MAGIC, 4))
    {
-      MESSAGE_ERROR("ROM: %s is not a valid ROM image\n", rominfo->filename);
-      return -1;
+      rominfo->rom_banks = head.rom_banks;
+      rominfo->vrom_banks = head.vrom_banks;
+      /* iNES assumptions */
+      rominfo->sram_banks = 8; /* 1kB banks, so 8KB */
+      rominfo->vram_banks = 1; /* 8kB banks, so 8KB */
+      rominfo->flags = head.rom_type;
+      rominfo->mapper_number = head.rom_type >> 4;
+
+      if (head.mapper_hinybble & 1)
+         rominfo->flags |= ROM_FLAG_VERSUS;
+
+      if (head.reserved2 == 0)
+      {
+         // https://wiki.nesdev.com/w/index.php/INES
+         // A general rule of thumb: if the last 4 bytes are not all zero, and the header is
+         // not marked for NES 2.0 format, an emulator should either mask off the upper 4 bits
+         // of the mapper number or simply refuse to load the ROM.
+
+         rominfo->mapper_number |= (head.mapper_hinybble & 0xF0);
+      }
+      return 0;
    }
-
-   rominfo->rom_banks = head.rom_banks;
-   rominfo->vrom_banks = head.vrom_banks;
-   /* iNES assumptions */
-   rominfo->sram_banks = 8; /* 1kB banks, so 8KB */
-   rominfo->vram_banks = 1; /* 8kB banks, so 8KB */
-   rominfo->flags = head.rom_type;
-   rominfo->mapper_number = head.rom_type >> 4;
-
-   if (head.mapper_hinybble & 1)
-      rominfo->flags |= ROM_FLAG_VERSUS;
-
-   if (head.reserved2 == 0)
+   else if (!memcmp(head.ines_magic, ROM_FDS_MAGIC, 4) || !memcmp(head.ines_magic, ROM_FDS_RAW_MAGIC, 15))
    {
-      // https://wiki.nesdev.com/w/index.php/INES
-      // A general rule of thumb: if the last 4 bytes are not all zero, and the header is
-      // not marked for NES 2.0 format, an emulator should either mask off the upper 4 bits
-      // of the mapper number or simply refuse to load the ROM.
+      //MESSAGE_INFO("ROM: Found FDS file of size %d.\n", size);
 
-      rominfo->mapper_number |= (head.mapper_hinybble & 0xF0);
+      rominfo->flags = ROM_FLAG_FDS_DISK|ROM_FLAG_BATTERY;
+      rominfo->vrom_banks = 4; // The FDS adapter contains 32KB to store game program
+      rominfo->vram_banks = 1; // The FDS adapter contains 8KB
+      rominfo->rom_banks = 1; // This will contain the FDS BIOS
+      rominfo->mapper_number = 20;
+
+      return 0;
    }
+   else if (!memcmp(head.ines_magic, ROM_NSF_MAGIC, 5))
+   {
+      //MESSAGE_INFO("ROM: Found NSF file of size %d.\n", size);
 
-   return 0;
+      rominfo->vrom_banks = 1; // Some songs may need it. I store a bootstrap program there at the moment
+      rominfo->vram_banks = 1; // Not used but some code might assume it will be present...
+      rominfo->rom_banks = 4; // This is actually PRG-RAM but some of our code assumes PRG-ROM to be present...
+      rominfo->mapper_number = 31;
+      return 0;
+   }
+   MESSAGE_ERROR("ROM: %s is not a valid ROM image\n", rominfo->filename);
+   return -1;
 }
 
 /* Load a ROM image into memory */
@@ -187,7 +207,7 @@ rominfo_t *rom_load(const char *filename)
       rominfo->vrom = rom_ptr;
       rom_ptr += VROM_BANK_LENGTH * rominfo->vrom_banks;
    }
-   else
+   if (rominfo->vram_banks)
    {
       rominfo->vram = calloc(VRAM_BANK_LENGTH, rominfo->vram_banks);
       if (NULL == rominfo->vram)

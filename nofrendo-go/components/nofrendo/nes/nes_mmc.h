@@ -35,6 +35,14 @@ typedef struct mmc_s mmc_t;
 #include "nes_rom.h"
 #include "nes_mem.h"
 
+
+#define PRG_RAM ((void*)1)
+#define PRG_ROM ((void*)2)
+#define PRG_ANY ((void*)3)
+#define CHR_RAM ((void*)4)
+#define CHR_ROM ((void*)5)
+#define CHR_ANY ((void*)6)
+
 struct mapintf_s
 {
    int number;
@@ -42,8 +50,8 @@ struct mapintf_s
    void (*init)(void);
    void (*vblank)(void);
    void (*hblank)(int scanline);
-   void (*get_state)(void *state); // State is a 128 bytes buffer
-   void (*set_state)(void *state); // State is a 128 bytes buffer
+   void (*get_state)(uint8 *state); // State is a 128 bytes buffer
+   void (*set_state)(uint8 *state); // State is a 128 bytes buffer
    mem_read_handler_t *mem_read;
    mem_write_handler_t *mem_write;
    apuext_t *sound_ext;
@@ -62,6 +70,8 @@ struct mmc_s
 extern void mmc_bankwram(int size, uint32 address, int bank);
 extern void mmc_bankvrom(int size, uint32 address, int bank);
 extern void mmc_bankrom(int size, uint32 address, int bank);
+extern void mmc_bankprg(int size, uint32 address, int bank, uint8 *base);
+extern void mmc_bankchr(int size, uint32 address, int bank, uint8 *base);
 
 extern mmc_t *mmc_init(rominfo_t *rominfo);
 extern void mmc_refresh(void);

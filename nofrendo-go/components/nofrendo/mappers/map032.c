@@ -17,10 +17,8 @@
 ** must bear this legend.
 **
 **
-** map32.c
+** map032.c: Irem G-101 mapper interface
 **
-** mapper 32 interface
-** $Id: map032.c,v 1.2 2001/04/27 14:37:11 neil Exp $
 */
 
 #include <nofrendo.h>
@@ -29,46 +27,43 @@
 
 static int select_c000 = 0;
 
-/* mapper 32: Irem G-101 */
-static void map32_write(uint32 address, uint8 value)
+
+static void map_write(uint32 address, uint8 value)
 {
-   switch (address >> 12)
-   {
-   case 0x08:
-      if (select_c000)
-         mmc_bankrom(8, 0xC000, value);
-      else
-         mmc_bankrom(8, 0x8000, value);
-      break;
+    switch (address >> 12)
+    {
+    case 0x08:
+        if (select_c000)
+            mmc_bankrom(8, 0xC000, value);
+        else
+            mmc_bankrom(8, 0x8000, value);
+        break;
 
-   case 0x09:
-      if (value & 1)
-         ppu_setmirroring(PPU_MIRROR_HORI);
-      else
-         ppu_setmirroring(PPU_MIRROR_VERT);
+    case 0x09:
+        if (value & 1)
+            ppu_setmirroring(PPU_MIRROR_HORI);
+        else
+            ppu_setmirroring(PPU_MIRROR_VERT);
 
-      select_c000 = (value & 0x02);
-      break;
+        select_c000 = (value & 0x02);
+        break;
 
-   case 0x0A:
-      mmc_bankrom(8, 0xA000, value);
-      break;
+    case 0x0A:
+        mmc_bankrom(8, 0xA000, value);
+        break;
 
-   case 0x0B:
-      {
-         int loc = (address & 0x07) << 10;
-         mmc_bankvrom(1, loc, value);
-      }
-      break;
+    case 0x0B:
+        mmc_bankvrom(1, (address & 0x07) << 10, value);
+        break;
 
-   default:
-      break;
-   }
+    default:
+        break;
+    }
 }
 
-static mem_write_handler_t map32_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map32_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -82,7 +77,7 @@ mapintf_t map32_intf =
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map32_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

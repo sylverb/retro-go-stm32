@@ -27,16 +27,16 @@
 #include <nes_mmc.h>
 
 /* mapper 3: CNROM */
-static void map3_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
    UNUSED(address);
 
    mmc_bankvrom(8, 0x0000, value);
 }
 
-static mem_write_handler_t map3_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map3_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -50,7 +50,7 @@ mapintf_t map3_intf =
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map3_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

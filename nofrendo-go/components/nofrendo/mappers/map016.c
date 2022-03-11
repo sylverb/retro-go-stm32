@@ -34,102 +34,88 @@ static struct
    bool enabled;
 } irq;
 
-// Shouldn't that be packed? (It wasn't packed in SNSS...)
-typedef struct
-{
-   unsigned char irqCounterLowByte;
-   unsigned char irqCounterHighByte;
-   unsigned char irqCounterEnabled;
-} mapper16Data;
-
 /* mapper 16: Bandai */
 
-static void map16_init(void)
+static void map_write(uint32 address, uint8 value)
 {
-   mmc_bankrom(16, 0x8000, 0);
-   mmc_bankrom(16, 0xC000, MMC_LASTBANK);
-   irq.counter = 0;
-   irq.enabled = false;
+    int reg = address & 0xF;
+
+    if (reg < 8)
+    {
+        mmc_bankvrom(1, reg << 10, value);
+    }
+    else
+    {
+        switch (address & 0x000F)
+        {
+        case 0x8:
+            mmc_bankrom(16, 0x8000, value);
+            break;
+
+        case 0x9:
+            switch (value & 3)
+            {
+            case 0: ppu_setmirroring(PPU_MIRROR_VERT); break;
+            case 1: ppu_setmirroring(PPU_MIRROR_HORI); break;
+            case 2: ppu_setmirroring(PPU_MIRROR_SCR0); break;
+            case 3: ppu_setmirroring(PPU_MIRROR_SCR1); break;
+            }
+            break;
+
+        case 0xA:
+            irq.enabled = (value & 1);
+            break;
+
+        case 0xB:
+            irq.counter = (irq.counter & 0xFF00) | value;
+            break;
+
+        case 0xC:
+            irq.counter = (value << 8) | (irq.counter & 0xFF);
+            break;
+
+        case 0xD:
+            /* eeprom I/O port? */
+            break;
+        }
+    }
 }
 
-static void map16_write(uint32 address, uint8 value)
-{
-   int reg = address & 0xF;
-
-   if (reg < 8)
-   {
-      mmc_bankvrom(1, reg << 10, value);
-   }
-   else
-   {
-      switch (address & 0x000F)
-      {
-      case 0x8:
-         mmc_bankrom(16, 0x8000, value);
-         break;
-
-      case 0x9:
-         switch (value & 3)
-         {
-         case 0: ppu_setmirroring(PPU_MIRROR_HORI); break;
-         case 1: ppu_setmirroring(PPU_MIRROR_VERT); break;
-         case 2: ppu_setmirroring(PPU_MIRROR_SCR0); break;
-         case 3: ppu_setmirroring(PPU_MIRROR_SCR1); break;
-         }
-         break;
-
-      case 0xA:
-         irq.enabled = (value & 1) ? true : false;
-         break;
-
-      case 0xB:
-         irq.counter = (irq.counter & 0xFF00) | value;
-         break;
-
-      case 0xC:
-         irq.counter = (value << 8) | (irq.counter & 0xFF);
-         break;
-
-      case 0xD:
-         /* eeprom I/O port? */
-         break;
-      }
-   }
-}
-
-static void map16_hblank(int vblank)
+static void map_hblank(int vblank)
 {
    UNUSED(vblank);
 
-   if (irq.enabled)
-   {
-      if (irq.counter)
-      {
-         if (0 == --irq.counter)
+    if (irq.enabled && irq.counter)
+    {
+        if (0 == --irq.counter)
             nes6502_irq();
-      }
-   }
+    }
 }
 
-static void map16_getstate(void *state)
+static void map_getstate(uint8 *state)
 {
-   ((mapper16Data*)state)->irqCounterLowByte = irq.counter & 0xFF;
-   ((mapper16Data*)state)->irqCounterHighByte = irq.counter >> 8;
-   ((mapper16Data*)state)->irqCounterEnabled = irq.enabled;
+    state[0] = irq.counter & 0xFF;
+    state[1] = irq.counter >> 8;
+    state[2] = irq.enabled;
 }
 
-static void map16_setstate(void *state)
+static void map_setstate(uint8 *state)
 {
-   irq.counter = (((mapper16Data*)state)->irqCounterHighByte << 8)
-                       | ((mapper16Data*)state)->irqCounterLowByte;
-   irq.enabled = ((mapper16Data*)state)->irqCounterEnabled;
+    irq.counter = (state[1] << 8) | state[0];
+    irq.enabled = state[2];
 }
-
-static mem_write_handler_t map16_memwrite[] =
+static void map_init(void)
 {
-   { 0x6000, 0x600D, map16_write },
-   { 0x7FF0, 0x7FFD, map16_write },
-   { 0x8000, 0x800D, map16_write },
+    mmc_bankrom(16, 0x8000, 0);
+    mmc_bankrom(16, 0xC000, MMC_LASTBANK);
+    irq.counter = 0;
+    irq.enabled = false;
+}
+static mem_write_handler_t map_memwrite[] =
+{
+   { 0x6000, 0x600D, map_write },
+   { 0x7FF0, 0x7FFD, map_write },
+   { 0x8000, 0x800D, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -137,13 +123,13 @@ mapintf_t map16_intf =
 {
    16, /* mapper number */
    "Bandai", /* mapper name */
-   map16_init, /* init routine */
+   map_init, /* init routine */
    NULL, /* vblank callback */
-   map16_hblank, /* hblank callback */
-   map16_getstate, /* get state (snss) */
-   map16_setstate, /* set state (snss) */
+   map_hblank, /* hblank callback */
+   map_getstate, /* get state (snss) */
+   map_setstate, /* set state (snss) */
    NULL, /* memory read structure */
-   map16_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 

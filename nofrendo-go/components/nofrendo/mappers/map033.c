@@ -17,79 +17,76 @@
 ** must bear this legend.
 **
 **
-** map33.c
+** map033.c: Taito TC0190 mapper interface
 **
-** mapper 33 interface
-** $Id: map033.c,v 1.2 2001/04/27 14:37:11 neil Exp $
 */
 
 #include <nofrendo.h>
 #include <nes_mmc.h>
 #include <nes_ppu.h>
 
-/* mapper 33: Taito TC0190*/
-static void map33_write(uint32 address, uint8 value)
+static void map_write(uint32 address, uint8 value)
 {
-   int page = (address >> 13) & 3;
-   int reg = address & 3;
+    int page = (address >> 13) & 3;
+    int reg = address & 3;
 
-   switch (page)
-   {
-   case 0: /* $800X */
-      switch (reg)
-      {
-      case 0:
-         mmc_bankrom(8, 0x8000, value);
-         break;
+    switch (page)
+    {
+    case 0: /* $800X */
+        switch (reg)
+        {
+        case 0:
+            mmc_bankrom(8, 0x8000, value);
+            break;
 
-      case 1:
-         mmc_bankrom(8, 0xA000, value);
-         break;
+        case 1:
+            mmc_bankrom(8, 0xA000, value);
+            break;
 
-      case 2:
-         mmc_bankvrom(2, 0x0000, value);
-         break;
+        case 2:
+            mmc_bankvrom(2, 0x0000, value);
+            break;
 
-      case 3:
-         mmc_bankvrom(2, 0x0800, value);
-         break;
-      }
-      break;
+        case 3:
+            mmc_bankvrom(2, 0x0800, value);
+            break;
+        }
+        break;
 
-   case 1: /* $A00X */
-      {
-         int loc = 0x1000 + (reg << 10);
-         mmc_bankvrom(1, loc, value);
-      }
-      break;
+    case 1: /* $A00X */
+        {
+            int loc = 0x1000 + (reg << 10);
+            mmc_bankvrom(1, loc, value);
+        }
+        break;
 
-   case 2: /* $C00X */
-   case 3: /* $E00X */
-      switch (reg)
-      {
-      case 0:
-         /* irqs maybe ? */
-         //break;
+    case 2: /* $C00X */
+    case 3: /* $E00X */
+        switch (reg)
+        {
+        case 0:
+            /* irqs maybe ? */
+            //break;
 
-      case 1:
-         /* this doesn't seem to work just right */
-         if (value & 1)
-            ppu_setmirroring(PPU_MIRROR_HORI);
-         else
-            ppu_setmirroring(PPU_MIRROR_VERT);
-         break;
+        case 1:
+            /* this doesn't seem to work just right */
+            if (value & 1)
+                ppu_setmirroring(PPU_MIRROR_HORI);
+            else
+                ppu_setmirroring(PPU_MIRROR_VERT);
+            break;
 
-      default:
-         break;
-      }
-      break;
-   }
+        default:
+            break;
+        }
+        break;
+    }
 }
 
 
-static mem_write_handler_t map33_memwrite[] =
+static mem_write_handler_t map_memwrite[] =
 {
-   { 0x8000, 0xFFFF, map33_write },
+   { 0x8000, 0xFFFF, map_write },
    LAST_MEMORY_HANDLER
 };
 
@@ -103,7 +100,7 @@ mapintf_t map33_intf =
    NULL, /* get state (snss) */
    NULL, /* set state (snss) */
    NULL, /* memory read structure */
-   map33_memwrite, /* memory write structure */
+   map_memwrite, /* memory write structure */
    NULL /* external sound device */
 };
 
