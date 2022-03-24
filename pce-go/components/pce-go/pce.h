@@ -145,6 +145,10 @@ typedef struct {
 	// Street Fighter 2 Mapper
 	uint8_t SF2;
 
+	// Game Genie Patch
+	uint8_t rp_count;
+	char **patchs;
+	
 	// Remanence latch
 	uint8_t io_buffer;
 	uint16_t VBlankFL;

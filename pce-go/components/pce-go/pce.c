@@ -79,6 +79,8 @@ pce_init(void)
     PCE.MemoryMapW[0xF8] = PCE.RAM;
     PCE.MemoryMapR[0xFF] = PCE.IOAREA;
     PCE.MemoryMapW[0xFF] = PCE.IOAREA;
+    PCE.rp_count = 0;
+    PCE.patchs = NULL;
 
     // pce_reset();
 
