@@ -46,17 +46,17 @@ static const UBYTE bcd2bin[0x100] = {
 // Addressing modes:
 #define imm_operand(addr)  ({uint32_t a = (addr); PageR[a >> 13][a];})
 #define abs_operand(x)     pce_read8(pce_read16(x))
-#define absx_operand(x)    pce_read8(pce_read16(x)+CPU.X)
-#define absy_operand(x)    pce_read8(pce_read16(x)+CPU.Y)
+#define absx_operand(x)    pce_read8(pce_read16(x)+CPU_PCE.X)
+#define absy_operand(x)    pce_read8(pce_read16(x)+CPU_PCE.Y)
 #define zp_operand(x)      get_8bit_zp(imm_operand(x))
-#define zpx_operand(x)     get_8bit_zp(imm_operand(x)+CPU.X)
-#define zpy_operand(x)     get_8bit_zp(imm_operand(x)+CPU.Y)
+#define zpx_operand(x)     get_8bit_zp(imm_operand(x)+CPU_PCE.X)
+#define zpy_operand(x)     get_8bit_zp(imm_operand(x)+CPU_PCE.Y)
 #define zpind_operand(x)   pce_read8(get_16bit_zp(imm_operand(x)))
-#define zpindx_operand(x)  pce_read8(get_16bit_zp(imm_operand(x)+CPU.X))
-#define zpindy_operand(x)  pce_read8(get_16bit_zp(imm_operand(x))+CPU.Y)
+#define zpindx_operand(x)  pce_read8(get_16bit_zp(imm_operand(x)+CPU_PCE.X))
+#define zpindy_operand(x)  pce_read8(get_16bit_zp(imm_operand(x))+CPU_PCE.Y)
 
 // Flag check (flags 'N' and 'Z'):
-#define chk_flnz_8bit(x) CPU.P = ((CPU.P & (~(FL_N|FL_T|FL_Z))) | FLAG_NZ(x));
+#define chk_flnz_8bit(x) CPU_PCE.P = ((CPU_PCE.P & (~(FL_N|FL_T|FL_Z))) | FLAG_NZ(x));
 
 // Zero page access
 #define get_8bit_zp(zp_addr) ({UBYTE x = zp_addr; *((UBYTE *)(ZP_BASE + (x)));})
@@ -65,10 +65,10 @@ static const UBYTE bcd2bin[0x100] = {
 #define put_8bit_zp(zp_addr, byte) ({UBYTE x = zp_addr; *(ZP_BASE + (x)) = (byte);})
 
 // Stack access
-#define push_8bit(byte) ({*(SP_BASE + CPU.S) = (byte); CPU.S--;})
+#define push_8bit(byte) ({*(SP_BASE + CPU_PCE.S) = (byte); CPU_PCE.S--;})
 #define push_16bit(addr) ({UWORD x = addr; push_8bit(x >> 8); push_8bit(x & 0xFF);})
-//#define pull_8bit() (*(SP_BASE + ++CPU.S))
-#define pull_8bit(x) ({ ++CPU.S; x = *(SP_BASE + CPU.S);})
+//#define pull_8bit() (*(SP_BASE + ++CPU_PCE.S))
+#define pull_8bit(x) ({ ++CPU_PCE.S; x = *(SP_BASE + CPU_PCE.S);})
 //#define pull_16bit() (pull_8bit() | pull_8bit() << 8)
 
 //
@@ -79,12 +79,12 @@ static inline UBYTE
 adc(UBYTE acc, UBYTE val)
 {
 	/* binary mode */
-	if (!(CPU.P & FL_D))
+	if (!(CPU_PCE.P & FL_D))
 	{
 		SWORD sig = (SBYTE)acc;
 		UWORD usig = (UBYTE)acc;
 
-		if (CPU.P & FL_C)
+		if (CPU_PCE.P & FL_C)
 		{
 			usig++;
 			sig++;
@@ -93,7 +93,7 @@ adc(UBYTE acc, UBYTE val)
 		usig += (UBYTE)val;
 		acc = (UBYTE)(usig & 0xFF);
 
-		CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z | FL_C)) | (((sig > 127) || (sig < -128)) ? FL_V : 0) | ((usig > 255) ? FL_C : 0) | FLAG_NZ(acc);
+		CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z | FL_C)) | (((sig > 127) || (sig < -128)) ? FL_V : 0) | ((usig > 255) ? FL_C : 0) | FLAG_NZ(acc);
 	}
 
 	/* decimal mode */
@@ -101,14 +101,14 @@ adc(UBYTE acc, UBYTE val)
 	{
 		uint32_t temp = bcd2bin[acc] + bcd2bin[val];
 
-		if (CPU.P & FL_C)
+		if (CPU_PCE.P & FL_C)
 		{
 			temp++;
 		}
 
 		acc = bin2bcd[temp];
 
-		CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp > 99) ? FL_C : 0) | FLAG_NZ(acc);
+		CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp > 99) ? FL_C : 0) | FLAG_NZ(acc);
 
 		Cycles++; /* decimal mode takes an extra cycle */
 	}
@@ -121,41 +121,41 @@ static ALWAYS_INLINE void
 sbc(UBYTE val)
 {
 	/* binary mode */
-	if (!(CPU.P & FL_D))
+	if (!(CPU_PCE.P & FL_D))
 	{
-		SWORD sig = (SBYTE)CPU.A;
-		UWORD usig = (UBYTE)CPU.A;
+		SWORD sig = (SBYTE)CPU_PCE.A;
+		UWORD usig = (UBYTE)CPU_PCE.A;
 
-		if (!(CPU.P & FL_C))
+		if (!(CPU_PCE.P & FL_C))
 		{
 			usig--;
 			sig--;
 		}
 		sig -= (SBYTE)val;
 		usig -= (UBYTE)val;
-		CPU.A = (UBYTE)(usig & 0xFF);
-		CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z | FL_C)) | (((sig > 127) || (sig < -128)) ? FL_V : 0) | ((usig > 255) ? 0 : FL_C) | FLAG_NZ(CPU.A);
+		CPU_PCE.A = (UBYTE)(usig & 0xFF);
+		CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z | FL_C)) | (((sig > 127) || (sig < -128)) ? FL_V : 0) | ((usig > 255) ? 0 : FL_C) | FLAG_NZ(CPU_PCE.A);
 	}
 
 	/* decimal mode */
 	else
 	{
-		int temp = (int)bcd2bin[CPU.A] - bcd2bin[val];
+		int temp = (int)bcd2bin[CPU_PCE.A] - bcd2bin[val];
 
-		if (!(CPU.P & FL_C))
+		if (!(CPU_PCE.P & FL_C))
 		{
 			temp--;
 		}
 
-		CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp < 0) ? 0 : FL_C);
+		CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp < 0) ? 0 : FL_C);
 
 		while (temp < 0)
 		{
 			temp += 100;
 		}
 
-		CPU.A = bin2bcd[temp];
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A = bin2bcd[temp];
+		chk_flnz_8bit(CPU_PCE.A);
 
 		Cycles++; /* decimal mode takes an extra cycle */
 	}
@@ -166,1003 +166,1003 @@ OPCODE_FUNC adc_abs(void)
 	// if flag 'T' is set, use zero-page address specified by register 'X'
 	// as the accumulator...
 
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), abs_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), abs_operand(CPU_PCE.PC + 1)));
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, abs_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, abs_operand(CPU_PCE.PC + 1));
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC adc_absx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), absx_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), absx_operand(CPU_PCE.PC + 1)));
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, absx_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, absx_operand(CPU_PCE.PC + 1));
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC adc_absy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), absy_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), absy_operand(CPU_PCE.PC + 1)));
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, absy_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, absy_operand(CPU_PCE.PC + 1));
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC adc_imm(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), imm_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), imm_operand(CPU_PCE.PC + 1)));
 		Cycles += 5;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, imm_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, imm_operand(CPU_PCE.PC + 1));
 		Cycles += 2;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC adc_zp(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), zp_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), zp_operand(CPU_PCE.PC + 1)));
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, zp_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, zp_operand(CPU_PCE.PC + 1));
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC adc_zpx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), zpx_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), zpx_operand(CPU_PCE.PC + 1)));
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, zpx_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, zpx_operand(CPU_PCE.PC + 1));
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC adc_zpind(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), zpind_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), zpind_operand(CPU_PCE.PC + 1)));
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, zpind_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, zpind_operand(CPU_PCE.PC + 1));
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC adc_zpindx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), zpindx_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), zpindx_operand(CPU_PCE.PC + 1)));
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, zpindx_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, zpindx_operand(CPU_PCE.PC + 1));
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC adc_zpindy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		put_8bit_zp(CPU.X, adc(get_8bit_zp(CPU.X), zpindy_operand(CPU.PC + 1)));
+		put_8bit_zp(CPU_PCE.X, adc(get_8bit_zp(CPU_PCE.X), zpindy_operand(CPU_PCE.PC + 1)));
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A = adc(CPU.A, zpindy_operand(CPU.PC + 1));
+		CPU_PCE.A = adc(CPU_PCE.A, zpindy_operand(CPU_PCE.PC + 1));
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC and_abs(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= abs_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= abs_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A &= abs_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= abs_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC and_absx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= absx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= absx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A &= absx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= absx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC and_absy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= absy_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= absy_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A &= absy_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= absy_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC and_imm(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= imm_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= imm_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 5;
 	}
 	else
 	{
-		CPU.A &= imm_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= imm_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 2;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC and_zp(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= zp_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= zp_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A &= zp_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= zp_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC and_zpx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= zpx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= zpx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A &= zpx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= zpx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC and_zpind(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= zpind_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= zpind_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A &= zpind_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= zpind_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC and_zpindx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= zpindx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= zpindx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A &= zpindx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= zpindx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC and_zpindy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp &= zpindy_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp &= zpindy_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A &= zpindy_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A &= zpindy_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC asl_a(void)
 {
-	UBYTE temp = CPU.A;
-	CPU.A <<= 1;
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 0x80) ? FL_C : 0) | FLAG_NZ(CPU.A);
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.A;
+	CPU_PCE.A <<= 1;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 0x80) ? FL_C : 0) | FLAG_NZ(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC asl_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp1 = pce_read8(temp_addr);
 	UBYTE temp = temp1 << 1;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC asl_absx(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1) + CPU.X;
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = pce_read8(temp_addr);
 	UBYTE temp = temp1 << 1;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC asl_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp1 = get_8bit_zp(zp_addr);
 	UBYTE temp = temp1 << 1;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC asl_zpx(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1) + CPU.X;
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = get_8bit_zp(zp_addr);
 	UBYTE temp = temp1 << 1;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC bbr(UBYTE bit)
 {
-	CPU.P &= ~FL_T;
-	if (zp_operand(CPU.PC + 1) & (1 << bit))
+	CPU_PCE.P &= ~FL_T;
+	if (zp_operand(CPU_PCE.PC + 1) & (1 << bit))
 	{
-		CPU.PC += 3;
+		CPU_PCE.PC += 3;
 		Cycles += 6;
 	}
 	else
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 2) + 3;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 2) + 3;
 		Cycles += 8;
 	}
 }
 
 OPCODE_FUNC bbs(UBYTE bit)
 {
-	CPU.P &= ~FL_T;
-	if (zp_operand(CPU.PC + 1) & (1 << bit))
+	CPU_PCE.P &= ~FL_T;
+	if (zp_operand(CPU_PCE.PC + 1) & (1 << bit))
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 2) + 3;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 2) + 3;
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.PC += 3;
+		CPU_PCE.PC += 3;
 		Cycles += 6;
 	}
 }
 
 OPCODE_FUNC bcc(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_C)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_C)
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 	else
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 }
 
 OPCODE_FUNC bcs(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_C)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_C)
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 	else
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 }
 
 OPCODE_FUNC beq(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_Z)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_Z)
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 	else
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 }
 
 OPCODE_FUNC bit_abs(void)
 {
-	UBYTE temp = abs_operand(CPU.PC + 1);
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU.A & temp) ? 0 : FL_Z);
-	CPU.PC += 3;
+	UBYTE temp = abs_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU_PCE.A & temp) ? 0 : FL_Z);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC bit_absx(void)
 {
-	UBYTE temp = absx_operand(CPU.PC + 1);
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU.A & temp) ? 0 : FL_Z);
-	CPU.PC += 3;
+	UBYTE temp = absx_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU_PCE.A & temp) ? 0 : FL_Z);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC bit_imm(void)
 {
-	UBYTE temp = imm_operand(CPU.PC + 1);
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU.A & temp) ? 0 : FL_Z);
-	CPU.PC += 2;
+	UBYTE temp = imm_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU_PCE.A & temp) ? 0 : FL_Z);
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC bit_zp(void)
 {
-	UBYTE temp = zp_operand(CPU.PC + 1);
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU.A & temp) ? 0 : FL_Z);
-	CPU.PC += 2;
+	UBYTE temp = zp_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU_PCE.A & temp) ? 0 : FL_Z);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC bit_zpx(void)
 {
-	UBYTE temp = zpx_operand(CPU.PC + 1);
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU.A & temp) ? 0 : FL_Z);
-	CPU.PC += 2;
+	UBYTE temp = zpx_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((CPU_PCE.A & temp) ? 0 : FL_Z);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC bmi(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_N)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_N)
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 	else
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 }
 
 OPCODE_FUNC bne(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_Z)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_Z)
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 	else
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 }
 
 OPCODE_FUNC bpl(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_N)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_N)
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 	else
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 }
 
 OPCODE_FUNC bra(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC brk(void)
 {
-	MESSAGE_DEBUG("BRK opcode has been hit [PC = 0x%04x] at %s(%d)\n", CPU.PC);
-	CPU.P &= ~FL_T;
-	push_16bit(CPU.PC + 2);
-	push_8bit(CPU.P | FL_B);
-	CPU.P = (CPU.P & ~FL_D) | FL_I;
-	CPU.PC = pce_read16(VEC_BRK);
+	MESSAGE_DEBUG("BRK opcode has been hit [PC = 0x%04x] at %s(%d)\n", CPU_PCE.PC);
+	CPU_PCE.P &= ~FL_T;
+	push_16bit(CPU_PCE.PC + 2);
+	push_8bit(CPU_PCE.P | FL_B);
+	CPU_PCE.P = (CPU_PCE.P & ~FL_D) | FL_I;
+	CPU_PCE.PC = pce_read16(VEC_BRK);
 	Cycles += 8;
 }
 
 OPCODE_FUNC bsr(void)
 {
-	CPU.P &= ~FL_T;
-	push_16bit(CPU.PC + 1);
-	CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+	CPU_PCE.P &= ~FL_T;
+	push_16bit(CPU_PCE.PC + 1);
+	CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 	Cycles += 8;
 }
 
 OPCODE_FUNC bvc(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_V)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_V)
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 	else
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 }
 
 OPCODE_FUNC bvs(void)
 {
-	CPU.P &= ~FL_T;
-	if (CPU.P & FL_V)
+	CPU_PCE.P &= ~FL_T;
+	if (CPU_PCE.P & FL_V)
 	{
-		CPU.PC += (SBYTE)imm_operand(CPU.PC + 1) + 2;
+		CPU_PCE.PC += (SBYTE)imm_operand(CPU_PCE.PC + 1) + 2;
 		Cycles += 4;
 	}
 	else
 	{
-		CPU.PC += 2;
+		CPU_PCE.PC += 2;
 		Cycles += 2;
 	}
 }
 
 OPCODE_FUNC cla(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.A = 0;
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.A = 0;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC clc(void)
 {
-	CPU.P &= ~(FL_T | FL_C);
-	CPU.PC++;
+	CPU_PCE.P &= ~(FL_T | FL_C);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cld(void)
 {
-	CPU.P &= ~(FL_T | FL_D);
-	CPU.PC++;
+	CPU_PCE.P &= ~(FL_T | FL_D);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cli(void)
 {
-	CPU.P &= ~(FL_T | FL_I);
-	CPU.PC++;
+	CPU_PCE.P &= ~(FL_T | FL_I);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC clv(void)
 {
-	CPU.P &= ~(FL_V | FL_T);
-	CPU.PC++;
+	CPU_PCE.P &= ~(FL_V | FL_T);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC clx(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.X = 0;
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.X = 0;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cly(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.Y = 0;
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.Y = 0;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cmp_abs(void)
 {
-	UBYTE temp = abs_operand(CPU.PC + 1);
+	UBYTE temp = abs_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC cmp_absx(void)
 {
-	UBYTE temp = absx_operand(CPU.PC + 1);
+	UBYTE temp = absx_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC cmp_absy(void)
 {
-	UBYTE temp = absy_operand(CPU.PC + 1);
+	UBYTE temp = absy_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC cmp_imm(void)
 {
-	UBYTE temp = imm_operand(CPU.PC + 1);
+	UBYTE temp = imm_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cmp_zp(void)
 {
-	UBYTE temp = zp_operand(CPU.PC + 1);
+	UBYTE temp = zp_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC cmp_zpx(void)
 {
-	UBYTE temp = zpx_operand(CPU.PC + 1);
+	UBYTE temp = zpx_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC cmp_zpind(void)
 {
-	UBYTE temp = zpind_operand(CPU.PC + 1);
+	UBYTE temp = zpind_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC cmp_zpindx(void)
 {
-	UBYTE temp = zpindx_operand(CPU.PC + 1);
+	UBYTE temp = zpindx_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC cmp_zpindy(void)
 {
-	UBYTE temp = zpindy_operand(CPU.PC + 1);
+	UBYTE temp = zpindy_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.A - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.A < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.A - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC cpx_abs(void)
 {
-	UBYTE temp = abs_operand(CPU.PC + 1);
+	UBYTE temp = abs_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.X < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.X - temp));
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.X < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.X - temp));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC cpx_imm(void)
 {
-	UBYTE temp = imm_operand(CPU.PC + 1);
+	UBYTE temp = imm_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.X < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.X - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.X < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.X - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cpx_zp(void)
 {
-	UBYTE temp = zp_operand(CPU.PC + 1);
+	UBYTE temp = zp_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.X < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.X - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.X < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.X - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC cpy_abs(void)
 {
-	UBYTE temp = abs_operand(CPU.PC + 1);
+	UBYTE temp = abs_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.Y < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.Y - temp));
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.Y < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.Y - temp));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC cpy_imm(void)
 {
-	UBYTE temp = imm_operand(CPU.PC + 1);
+	UBYTE temp = imm_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.Y < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.Y - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.Y < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.Y - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC cpy_zp(void)
 {
-	UBYTE temp = zp_operand(CPU.PC + 1);
+	UBYTE temp = zp_operand(CPU_PCE.PC + 1);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU.Y < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU.Y - temp));
-	CPU.PC += 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((CPU_PCE.Y < temp) ? 0 : FL_C) | FLAG_NZ((UBYTE)(CPU_PCE.Y - temp));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC dec_a(void)
 {
-	--CPU.A;
-	chk_flnz_8bit(CPU.A);
-	CPU.PC++;
+	--CPU_PCE.A;
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC dec_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp = pce_read8(temp_addr) - 1;
 	chk_flnz_8bit(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC dec_absx(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1) + CPU.X;
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp = pce_read8(temp_addr) - 1;
 	chk_flnz_8bit(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC dec_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp = get_8bit_zp(zp_addr) - 1;
 	chk_flnz_8bit(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC dec_zpx(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1) + CPU.X;
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp = get_8bit_zp(zp_addr) - 1;
 	chk_flnz_8bit(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC dex(void)
 {
-	--CPU.X;
-	chk_flnz_8bit(CPU.X);
-	CPU.PC++;
+	--CPU_PCE.X;
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC dey(void)
 {
-	--CPU.Y;
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC++;
+	--CPU_PCE.Y;
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC eor_abs(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= abs_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= abs_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A ^= abs_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= abs_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC eor_absx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= absx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= absx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A ^= absx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= absx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC eor_absy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= absy_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= absy_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A ^= absy_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= absy_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC eor_imm(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= imm_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= imm_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 5;
 	}
 	else
 	{
-		CPU.A ^= imm_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= imm_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 2;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC eor_zp(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= zp_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= zp_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A ^= zp_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= zp_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC eor_zpx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= zpx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= zpx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A ^= zpx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= zpx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC eor_zpind(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= zpind_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= zpind_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A ^= zpind_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= zpind_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC eor_zpindx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= zpindx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= zpindx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A ^= zpindx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= zpindx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC eor_zpindy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp ^= zpindy_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp ^= zpindy_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A ^= zpindy_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A ^= zpindy_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC halt(void)
@@ -1172,996 +1172,996 @@ OPCODE_FUNC halt(void)
 
 OPCODE_FUNC inc_a(void)
 {
-	++CPU.A;
-	chk_flnz_8bit(CPU.A);
-	CPU.PC++;
+	++CPU_PCE.A;
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC inc_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp = pce_read8(temp_addr) + 1;
 	chk_flnz_8bit(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC inc_absx(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1) + CPU.X;
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp = pce_read8(temp_addr) + 1;
 	chk_flnz_8bit(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC inc_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp = get_8bit_zp(zp_addr) + 1;
 	chk_flnz_8bit(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC inc_zpx(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1) + CPU.X;
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp = get_8bit_zp(zp_addr) + 1;
 	chk_flnz_8bit(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC inx(void)
 {
-	++CPU.X;
-	chk_flnz_8bit(CPU.X);
-	CPU.PC++;
+	++CPU_PCE.X;
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC iny(void)
 {
-	++CPU.Y;
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC++;
+	++CPU_PCE.Y;
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC jmp(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.PC = pce_read16(CPU.PC + 1);
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC = pce_read16(CPU_PCE.PC + 1);
 	Cycles += 4;
 }
 
 OPCODE_FUNC jmp_absind(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.PC = pce_read16(pce_read16(CPU.PC + 1));
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC = pce_read16(pce_read16(CPU_PCE.PC + 1));
 	Cycles += 7;
 }
 
 OPCODE_FUNC jmp_absindx(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.PC = pce_read16(pce_read16(CPU.PC + 1) + CPU.X);
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC = pce_read16(pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X);
 	Cycles += 7;
 }
 
 OPCODE_FUNC jsr(void)
 {
-	CPU.P &= ~FL_T;
-	push_16bit(CPU.PC + 2);
-	CPU.PC = pce_read16(CPU.PC + 1);
+	CPU_PCE.P &= ~FL_T;
+	push_16bit(CPU_PCE.PC + 2);
+	CPU_PCE.PC = pce_read16(CPU_PCE.PC + 1);
 	Cycles += 7;
 }
 
 OPCODE_FUNC lda_abs(void)
 {
-	CPU.A = abs_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 3;
+	CPU_PCE.A = abs_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC lda_absx(void)
 {
-	CPU.A = absx_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 3;
+	CPU_PCE.A = absx_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC lda_absy(void)
 {
-	CPU.A = absy_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 3;
+	CPU_PCE.A = absy_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC lda_imm(void)
 {
-	CPU.A = imm_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.A = imm_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC lda_zp(void)
 {
-	CPU.A = zp_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.A = zp_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC lda_zpx(void)
 {
-	CPU.A = zpx_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.A = zpx_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC lda_zpind(void)
 {
-	CPU.A = zpind_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.A = zpind_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC lda_zpindx(void)
 {
-	CPU.A = zpindx_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.A = zpindx_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC lda_zpindy(void)
 {
-	CPU.A = zpindy_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.A = zpindy_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC ldx_abs(void)
 {
-	CPU.X = abs_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.X);
-	CPU.PC += 3;
+	CPU_PCE.X = abs_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC ldx_absy(void)
 {
-	CPU.X = absy_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.X);
-	CPU.PC += 3;
+	CPU_PCE.X = absy_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC ldx_imm(void)
 {
-	CPU.X = imm_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.X);
-	CPU.PC += 2;
+	CPU_PCE.X = imm_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC ldx_zp(void)
 {
-	CPU.X = zp_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.X);
-	CPU.PC += 2;
+	CPU_PCE.X = zp_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC ldx_zpy(void)
 {
-	CPU.X = zpy_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.X);
-	CPU.PC += 2;
+	CPU_PCE.X = zpy_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC ldy_abs(void)
 {
-	CPU.Y = abs_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC += 3;
+	CPU_PCE.Y = abs_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC ldy_absx(void)
 {
-	CPU.Y = absx_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC += 3;
+	CPU_PCE.Y = absx_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC ldy_imm(void)
 {
-	CPU.Y = imm_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC += 2;
+	CPU_PCE.Y = imm_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC ldy_zp(void)
 {
-	CPU.Y = zp_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC += 2;
+	CPU_PCE.Y = zp_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC ldy_zpx(void)
 {
-	CPU.Y = zpx_operand(CPU.PC + 1);
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC += 2;
+	CPU_PCE.Y = zpx_operand(CPU_PCE.PC + 1);
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC lsr_a(void)
 {
-	UBYTE temp = CPU.A;
-	CPU.A /= 2;
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 1) ? FL_C : 0) | FLAG_NZ(CPU.A);
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.A;
+	CPU_PCE.A /= 2;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 1) ? FL_C : 0) | FLAG_NZ(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC lsr_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp1 = pce_read8(temp_addr);
 	UBYTE temp = temp1 / 2;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC lsr_absx(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1) + CPU.X;
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = pce_read8(temp_addr);
 	UBYTE temp = temp1 / 2;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC lsr_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp1 = get_8bit_zp(zp_addr);
 	UBYTE temp = temp1 / 2;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC lsr_zpx(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1) + CPU.X;
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = get_8bit_zp(zp_addr);
 	UBYTE temp = temp1 / 2;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 1) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC nop(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC ora_abs(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= abs_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= abs_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A |= abs_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= abs_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC ora_absx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= absx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= absx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A |= absx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= absx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC ora_absy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= absy_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= absy_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 8;
 	}
 	else
 	{
-		CPU.A |= absy_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= absy_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 5;
 	}
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC ora_imm(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= imm_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= imm_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 5;
 	}
 	else
 	{
-		CPU.A |= imm_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= imm_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 2;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC ora_zp(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= zp_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= zp_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A |= zp_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= zp_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC ora_zpx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= zpx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= zpx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 7;
 	}
 	else
 	{
-		CPU.A |= zpx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= zpx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 4;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC ora_zpind(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= zpind_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= zpind_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A |= zpind_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= zpind_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC ora_zpindx(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= zpindx_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= zpindx_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A |= zpindx_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= zpindx_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC ora_zpindy(void)
 {
-	if (CPU.P & FL_T)
+	if (CPU_PCE.P & FL_T)
 	{
-		UBYTE temp = get_8bit_zp(CPU.X);
-		temp |= zpindy_operand(CPU.PC + 1);
+		UBYTE temp = get_8bit_zp(CPU_PCE.X);
+		temp |= zpindy_operand(CPU_PCE.PC + 1);
 		chk_flnz_8bit(temp);
-		put_8bit_zp(CPU.X, temp);
+		put_8bit_zp(CPU_PCE.X, temp);
 		Cycles += 10;
 	}
 	else
 	{
-		CPU.A |= zpindy_operand(CPU.PC + 1);
-		chk_flnz_8bit(CPU.A);
+		CPU_PCE.A |= zpindy_operand(CPU_PCE.PC + 1);
+		chk_flnz_8bit(CPU_PCE.A);
 		Cycles += 7;
 	}
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 }
 
 OPCODE_FUNC pha(void)
 {
-	CPU.P &= ~FL_T;
-	push_8bit(CPU.A);
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	push_8bit(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC php(void)
 {
-	CPU.P &= ~FL_T;
-	push_8bit(CPU.P);
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	push_8bit(CPU_PCE.P);
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC phx(void)
 {
-	CPU.P &= ~FL_T;
-	push_8bit(CPU.X);
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	push_8bit(CPU_PCE.X);
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC phy(void)
 {
-	CPU.P &= ~FL_T;
-	push_8bit(CPU.Y);
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	push_8bit(CPU_PCE.Y);
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC pla(void)
 {
-	pull_8bit(CPU.A);
-	chk_flnz_8bit(CPU.A);
-	CPU.PC++;
+	pull_8bit(CPU_PCE.A);
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 4;
 }
 
 OPCODE_FUNC plp(void)
 {
-	pull_8bit(CPU.P);
-	CPU.PC++;
+	pull_8bit(CPU_PCE.P);
+	CPU_PCE.PC++;
 	Cycles += 4;
 }
 
 OPCODE_FUNC plx(void)
 {
-	pull_8bit(CPU.X);
-	chk_flnz_8bit(CPU.X);
-	CPU.PC++;
+	pull_8bit(CPU_PCE.X);
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC++;
 	Cycles += 4;
 }
 
 OPCODE_FUNC ply(void)
 {	
-	pull_8bit(CPU.Y);
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC++;
+	pull_8bit(CPU_PCE.Y);
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC++;
 	Cycles += 4;
 }
 
 OPCODE_FUNC rmb(UBYTE bit)
 {
-	UBYTE temp = imm_operand(CPU.PC + 1);
-	CPU.P &= ~FL_T;
+	UBYTE temp = imm_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P &= ~FL_T;
 	put_8bit_zp(temp, get_8bit_zp(temp) & (~(1 << bit)));
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC rol_a(void)
 {
-	UBYTE temp = CPU.A;
-	CPU.A = (CPU.A << 1) + (CPU.P & FL_C);
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 0x80) ? FL_C : 0) | FLAG_NZ(CPU.A);
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.A;
+	CPU_PCE.A = (CPU_PCE.A << 1) + (CPU_PCE.P & FL_C);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 0x80) ? FL_C : 0) | FLAG_NZ(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC rol_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp1 = pce_read8(temp_addr);
-	UBYTE temp = (temp1 << 1) + (CPU.P & FL_C);
+	UBYTE temp = (temp1 << 1) + (CPU_PCE.P & FL_C);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	Cycles += 7;
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC rol_absx(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1) + CPU.X;
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = pce_read8(temp_addr);
-	UBYTE temp = (temp1 << 1) + (CPU.P & FL_C);
+	UBYTE temp = (temp1 << 1) + (CPU_PCE.P & FL_C);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	Cycles += 7;
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC rol_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp1 = get_8bit_zp(zp_addr);
-	UBYTE temp = (temp1 << 1) + (CPU.P & FL_C);
+	UBYTE temp = (temp1 << 1) + (CPU_PCE.P & FL_C);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC rol_zpx(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1) + CPU.X;
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = get_8bit_zp(zp_addr);
-	UBYTE temp = (temp1 << 1) + (CPU.P & FL_C);
+	UBYTE temp = (temp1 << 1) + (CPU_PCE.P & FL_C);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x80) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC ror_a(void)
 {
-	UBYTE temp = CPU.A;
-	CPU.A = (CPU.A >> 1) + ((CPU.P & FL_C) ? 0x80 : 0);
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 0x01) ? FL_C : 0) | FLAG_NZ(CPU.A);
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.A;
+	CPU_PCE.A = (CPU_PCE.A >> 1) + ((CPU_PCE.P & FL_C) ? 0x80 : 0);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp & 0x01) ? FL_C : 0) | FLAG_NZ(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC ror_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp1 = pce_read8(temp_addr);
-	UBYTE temp = (temp1 >> 1) + ((CPU.P & FL_C) ? 0x80 : 0);
+	UBYTE temp = (temp1 >> 1) + ((CPU_PCE.P & FL_C) ? 0x80 : 0);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
 	Cycles += 7;
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC ror_absx(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1) + CPU.X;
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = pce_read8(temp_addr);
-	UBYTE temp = (temp1 >> 1) + ((CPU.P & FL_C) ? 0x80 : 0);
+	UBYTE temp = (temp1 >> 1) + ((CPU_PCE.P & FL_C) ? 0x80 : 0);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
 	Cycles += 7;
 	pce_write8(temp_addr, temp);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 }
 
 OPCODE_FUNC ror_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp1 = get_8bit_zp(zp_addr);
-	UBYTE temp = (temp1 >> 1) + ((CPU.P & FL_C) ? 0x80 : 0);
+	UBYTE temp = (temp1 >> 1) + ((CPU_PCE.P & FL_C) ? 0x80 : 0);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC ror_zpx(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1) + CPU.X;
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X;
 	UBYTE temp1 = get_8bit_zp(zp_addr);
-	UBYTE temp = (temp1 >> 1) + ((CPU.P & FL_C) ? 0x80 : 0);
+	UBYTE temp = (temp1 >> 1) + ((CPU_PCE.P & FL_C) ? 0x80 : 0);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_T | FL_Z | FL_C)) | ((temp1 & 0x01) ? FL_C : 0) | FLAG_NZ(temp);
 	put_8bit_zp(zp_addr, temp);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC rti(void)
 {
 	/* FL_B reset in RTI */
-	pull_8bit(CPU.P);
-	CPU.P &= ~FL_B;
+	pull_8bit(CPU_PCE.P);
+	CPU_PCE.P &= ~FL_B;
 	uint8_t t, t2;
 	pull_8bit(t);
 	pull_8bit(t2);
-	CPU.PC = (t | t2 << 8);
+	CPU_PCE.PC = (t | t2 << 8);
 	Cycles += 7;
 }
 
 OPCODE_FUNC rts(void)
 {
-	CPU.P &= ~FL_T;
+	CPU_PCE.P &= ~FL_T;
 	uint8_t t, t2;
 	pull_8bit(t);
 	pull_8bit(t2);
-	CPU.PC = (t | t2 << 8) + 1;
+	CPU_PCE.PC = (t | t2 << 8) + 1;
 	Cycles += 7;
 }
 
 OPCODE_FUNC sax(void)
 {
-	UBYTE temp = CPU.X;
-	CPU.P &= ~FL_T;
-	CPU.X = CPU.A;
-	CPU.A = temp;
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.X;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.X = CPU_PCE.A;
+	CPU_PCE.A = temp;
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC say(void)
 {
-	UBYTE temp = CPU.Y;
-	CPU.P &= ~FL_T;
-	CPU.Y = CPU.A;
-	CPU.A = temp;
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.Y;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.Y = CPU_PCE.A;
+	CPU_PCE.A = temp;
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC sbc_abs(void)
 {
-	sbc(abs_operand(CPU.PC + 1));
-	CPU.PC += 3;
+	sbc(abs_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sbc_absx(void)
 {
-	sbc(absx_operand(CPU.PC + 1));
-	CPU.PC += 3;
+	sbc(absx_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sbc_absy(void)
 {
-	sbc(absy_operand(CPU.PC + 1));
-	CPU.PC += 3;
+	sbc(absy_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sbc_imm(void)
 {
-	sbc(imm_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	sbc(imm_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 2;
 }
 
 OPCODE_FUNC sbc_zp(void)
 {
-	sbc(zp_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	sbc(zp_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sbc_zpx(void)
 {
-	sbc(zpx_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	sbc(zpx_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sbc_zpind(void)
 {
-	sbc(zpind_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	sbc(zpind_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC sbc_zpindx(void)
 {
-	sbc(zpindx_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	sbc(zpindx_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC sbc_zpindy(void)
 {
-	sbc(zpindy_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	sbc(zpindy_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC sec(void)
 {
-	CPU.P = (CPU.P | FL_C) & ~FL_T;
-	CPU.PC++;
+	CPU_PCE.P = (CPU_PCE.P | FL_C) & ~FL_T;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC sed(void)
 {
-	CPU.P = (CPU.P | FL_D) & ~FL_T;
-	CPU.PC++;
+	CPU_PCE.P = (CPU_PCE.P | FL_D) & ~FL_T;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC sei(void)
 {
-	CPU.P = (CPU.P | FL_I) & ~FL_T;
-	CPU.PC++;
+	CPU_PCE.P = (CPU_PCE.P | FL_I) & ~FL_T;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC set(void)
 {
-	CPU.P |= FL_T;
-	CPU.PC++;
+	CPU_PCE.P |= FL_T;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC smb(UBYTE bit)
 {
-	UBYTE temp = imm_operand(CPU.PC + 1);
-	CPU.P &= ~FL_T;
+	UBYTE temp = imm_operand(CPU_PCE.PC + 1);
+	CPU_PCE.P &= ~FL_T;
 	put_8bit_zp(temp, get_8bit_zp(temp) | (1 << bit));
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC st0(void)
 {
-	CPU.P &= ~FL_T;
-	pce_writeIO(0, imm_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	pce_writeIO(0, imm_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC st1(void)
 {
-	CPU.P &= ~FL_T;
-	pce_writeIO(2, imm_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	pce_writeIO(2, imm_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC st2(void)
 {
-	CPU.P &= ~FL_T;
-	pce_writeIO(3, imm_operand(CPU.PC + 1));
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	pce_writeIO(3, imm_operand(CPU_PCE.PC + 1));
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sta_abs(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(pce_read16(CPU.PC + 1), CPU.A);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(pce_read16(CPU_PCE.PC + 1), CPU_PCE.A);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sta_absx(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(pce_read16(CPU.PC + 1) + CPU.X, CPU.A);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X, CPU_PCE.A);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sta_absy(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(pce_read16(CPU.PC + 1) + CPU.Y, CPU.A);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(pce_read16(CPU_PCE.PC + 1) + CPU_PCE.Y, CPU_PCE.A);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sta_zp(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1), CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1), CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sta_zpx(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1) + CPU.X, CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X, CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sta_zpind(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(get_16bit_zp(imm_operand(CPU.PC + 1)), CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(get_16bit_zp(imm_operand(CPU_PCE.PC + 1)), CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC sta_zpindx(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(get_16bit_zp(imm_operand(CPU.PC + 1) + CPU.X), CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(get_16bit_zp(imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X), CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC sta_zpindy(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(get_16bit_zp(imm_operand(CPU.PC + 1)) + CPU.Y, CPU.A);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(get_16bit_zp(imm_operand(CPU_PCE.PC + 1)) + CPU_PCE.Y, CPU_PCE.A);
+	CPU_PCE.PC += 2;
 	Cycles += 7;
 }
 
 OPCODE_FUNC stx_abs(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(pce_read16(CPU.PC + 1), CPU.X);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(pce_read16(CPU_PCE.PC + 1), CPU_PCE.X);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC stx_zp(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1), CPU.X);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1), CPU_PCE.X);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC stx_zpy(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1) + CPU.Y, CPU.X);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1) + CPU_PCE.Y, CPU_PCE.X);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sty_abs(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(pce_read16(CPU.PC + 1), CPU.Y);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(pce_read16(CPU_PCE.PC + 1), CPU_PCE.Y);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC sty_zp(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1), CPU.Y);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1), CPU_PCE.Y);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sty_zpx(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1) + CPU.X, CPU.Y);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X, CPU_PCE.Y);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC stz_abs(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8(pce_read16(CPU.PC + 1), 0);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8(pce_read16(CPU_PCE.PC + 1), 0);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC stz_absx(void)
 {
-	CPU.P &= ~FL_T;
-	pce_write8((pce_read16(CPU.PC + 1) + CPU.X), 0);
-	CPU.PC += 3;
+	CPU_PCE.P &= ~FL_T;
+	pce_write8((pce_read16(CPU_PCE.PC + 1) + CPU_PCE.X), 0);
+	CPU_PCE.PC += 3;
 	Cycles += 5;
 }
 
 OPCODE_FUNC stz_zp(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1), 0);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1), 0);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC stz_zpx(void)
 {
-	CPU.P &= ~FL_T;
-	put_8bit_zp(imm_operand(CPU.PC + 1) + CPU.X, 0);
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	put_8bit_zp(imm_operand(CPU_PCE.PC + 1) + CPU_PCE.X, 0);
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC sxy(void)
 {
-	UBYTE temp = CPU.Y;
-	CPU.P &= ~FL_T;
-	CPU.Y = CPU.X;
-	CPU.X = temp;
-	CPU.PC++;
+	UBYTE temp = CPU_PCE.Y;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.Y = CPU_PCE.X;
+	CPU_PCE.X = temp;
+	CPU_PCE.PC++;
 	Cycles += 3;
 }
 
 OPCODE_FUNC tai(void)
 {
-	CPU.P &= ~FL_T;
-	UWORD from = pce_read16(CPU.PC + 1);
-	UWORD to = pce_read16(CPU.PC + 3);
-	UWORD len = pce_read16(CPU.PC + 5);
+	CPU_PCE.P &= ~FL_T;
+	UWORD from = pce_read16(CPU_PCE.PC + 1);
+	UWORD to = pce_read16(CPU_PCE.PC + 3);
+	UWORD len = pce_read16(CPU_PCE.PC + 5);
 	if ( len == 0 ) len = 0xffff;
 	UWORD alternate = 0;
 
@@ -2171,20 +2171,20 @@ OPCODE_FUNC tai(void)
 		pce_write8(to++, pce_read8(from + alternate));
 		alternate ^= 1;
 	}
-	CPU.PC += 7;
+	CPU_PCE.PC += 7;
 }
 
 OPCODE_FUNC csh(void) 
 {
-  PCE.Timer.cycles_per_line = 455; /* 21477270 / 3 / 60 / 263 */ /* 7.16 Mhz CPU clock */
-  CPU.PC++;
+  PCE.Timer.cycles_per_line = 455; /* 21477270 / 3 / 60 / 263 */ /* 7.16 Mhz CPU_PCE clock */
+  CPU_PCE.PC++;
   Cycles+=3;
 }
 
 OPCODE_FUNC csl(void) 
 {
-  PCE.Timer.cycles_per_line = 113; /* 21477270 / 12 / 60 / 263 */ /* 1.78 Mhz CPU clock */
-  CPU.PC++;
+  PCE.Timer.cycles_per_line = 113; /* 21477270 / 12 / 60 / 263 */ /* 1.78 Mhz CPU_PCE clock */
+  CPU_PCE.PC++;
   Cycles+=3;
 }
 
@@ -2193,45 +2193,45 @@ static int tamread = 0;
 
 OPCODE_FUNC tam(void)
 {
-	UBYTE bitfld = imm_operand(CPU.PC + 1);
+	UBYTE bitfld = imm_operand(CPU_PCE.PC + 1);
 
 	tamwrite = -1;
 	for (int i = 0; i < 8; i++)
 	{
 		if (bitfld & (1 << i))
 		{
-			pce_bank_set(i, CPU.A);
-			tamwrite = CPU.A;
+			pce_bank_set(i, CPU_PCE.A);
+			tamwrite = CPU_PCE.A;
 		}
 	}
 
-	CPU.P &= ~FL_T;
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC += 2;
 	Cycles += 5;
 }
 
 OPCODE_FUNC tax(void)
 {
-	CPU.X = CPU.A;
-	chk_flnz_8bit(CPU.A);
-	CPU.PC++;
+	CPU_PCE.X = CPU_PCE.A;
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC tay(void)
 {
-	CPU.Y = CPU.A;
-	chk_flnz_8bit(CPU.A);
-	CPU.PC++;
+	CPU_PCE.Y = CPU_PCE.A;
+	chk_flnz_8bit(CPU_PCE.A);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC tdd(void)
 {
-	CPU.P &= ~FL_T;
-	UWORD from = pce_read16(CPU.PC + 1);
-	UWORD to = pce_read16(CPU.PC + 3);
-	UWORD len = pce_read16(CPU.PC + 5);
+	CPU_PCE.P &= ~FL_T;
+	UWORD from = pce_read16(CPU_PCE.PC + 1);
+	UWORD to = pce_read16(CPU_PCE.PC + 3);
+	UWORD len = pce_read16(CPU_PCE.PC + 5);
 	if ( len == 0 ) len = 0xffff;
 
 	Cycles += (6 * len) + 17;
@@ -2239,15 +2239,15 @@ OPCODE_FUNC tdd(void)
 	{
 		pce_write8(to--, pce_read8(from--));
 	}
-	CPU.PC += 7;
+	CPU_PCE.PC += 7;
 }
 
 OPCODE_FUNC tia(void)
 {
-	CPU.P &= ~FL_T;
-	UWORD from = pce_read16(CPU.PC + 1);
-	UWORD to = pce_read16(CPU.PC + 3);
-	UWORD len = pce_read16(CPU.PC + 5);
+	CPU_PCE.P &= ~FL_T;
+	UWORD from = pce_read16(CPU_PCE.PC + 1);
+	UWORD to = pce_read16(CPU_PCE.PC + 3);
+	UWORD len = pce_read16(CPU_PCE.PC + 5);
 	if ( len == 0 ) len = 0xffff;
 	UWORD alternate = 0;
 
@@ -2257,15 +2257,15 @@ OPCODE_FUNC tia(void)
 		pce_write8(to + alternate, pce_read8(from++));
 		alternate ^= 1;
 	}
-	CPU.PC += 7;
+	CPU_PCE.PC += 7;
 }
 
 OPCODE_FUNC tii(void)
 {
-	CPU.P &= ~FL_T;
-	UWORD from = pce_read16(CPU.PC + 1);
-	UWORD to = pce_read16(CPU.PC + 3);
-	UWORD len = pce_read16(CPU.PC + 5);
+	CPU_PCE.P &= ~FL_T;
+	UWORD from = pce_read16(CPU_PCE.PC + 1);
+	UWORD to = pce_read16(CPU_PCE.PC + 3);
+	UWORD len = pce_read16(CPU_PCE.PC + 5);
 	if ( len == 0 ) len = 0xffff;
 
 	Cycles += (6 * len) + 17;
@@ -2273,15 +2273,15 @@ OPCODE_FUNC tii(void)
 	{
 		pce_write8(to++, pce_read8(from++));
 	}
-	CPU.PC += 7;
+	CPU_PCE.PC += 7;
 }
 
 OPCODE_FUNC tin(void)
 {
-	CPU.P &= ~FL_T;
-	UWORD from = pce_read16(CPU.PC + 1);
-	UWORD to = pce_read16(CPU.PC + 3);
-	UWORD len = pce_read16(CPU.PC + 5);
+	CPU_PCE.P &= ~FL_T;
+	UWORD from = pce_read16(CPU_PCE.PC + 1);
+	UWORD to = pce_read16(CPU_PCE.PC + 3);
+	UWORD len = pce_read16(CPU_PCE.PC + 5);
 	if ( len == 0 ) len = 0xffff;
 
 	Cycles += (6 * len) + 17;
@@ -2289,12 +2289,12 @@ OPCODE_FUNC tin(void)
 	{
 		pce_write8(to, pce_read8(from++));
 	}
-	CPU.PC += 7;
+	CPU_PCE.PC += 7;
 }
 
 OPCODE_FUNC tma(void)
 {
-	UBYTE bitfld = imm_operand(CPU.PC + 1);
+	UBYTE bitfld = imm_operand(CPU_PCE.PC + 1);
 
 	if ( bitfld & 0xff )
 	{
@@ -2302,135 +2302,135 @@ OPCODE_FUNC tma(void)
 		{
 			if (bitfld & (1 << i))
 			{
-				CPU.A = PCE.MMR[i];
+				CPU_PCE.A = PCE.MMR[i];
 			}
 		}
-		tamread = CPU.A;
+		tamread = CPU_PCE.A;
 	} else {
-		CPU.A = ( tamwrite != -1 ) ? tamwrite : tamread ;
+		CPU_PCE.A = ( tamwrite != -1 ) ? tamwrite : tamread ;
 	}
-	CPU.P &= ~FL_T;
-	CPU.PC += 2;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.PC += 2;
 	Cycles += 4;
 }
 
 OPCODE_FUNC trb_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp = pce_read8(temp_addr);
-	UBYTE temp1 = (~CPU.A) & temp;
+	UBYTE temp1 = (~CPU_PCE.A) & temp;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
 	pce_write8(temp_addr, temp1);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC trb_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp = get_8bit_zp(zp_addr);
-	UBYTE temp1 = (~CPU.A) & temp;
+	UBYTE temp1 = (~CPU_PCE.A) & temp;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
 	put_8bit_zp(zp_addr, temp1);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC tsb_abs(void)
 {
-	UWORD temp_addr = pce_read16(CPU.PC + 1);
+	UWORD temp_addr = pce_read16(CPU_PCE.PC + 1);
 	UBYTE temp = pce_read8(temp_addr);
-	UBYTE temp1 = CPU.A | temp;
+	UBYTE temp1 = CPU_PCE.A | temp;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
 	pce_write8(temp_addr, temp1);
-	CPU.PC += 3;
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC tsb_zp(void)
 {
-	UBYTE zp_addr = imm_operand(CPU.PC + 1);
+	UBYTE zp_addr = imm_operand(CPU_PCE.PC + 1);
 	UBYTE temp = get_8bit_zp(zp_addr);
-	UBYTE temp1 = CPU.A | temp;
+	UBYTE temp1 = CPU_PCE.A | temp;
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
 	put_8bit_zp(zp_addr, temp1);
-	CPU.PC += 2;
+	CPU_PCE.PC += 2;
 	Cycles += 6;
 }
 
 OPCODE_FUNC tstins_abs(void)
 {
-	UBYTE imm_addr = imm_operand(CPU.PC + 1);
-	UBYTE temp = abs_operand(CPU.PC + 2);
+	UBYTE imm_addr = imm_operand(CPU_PCE.PC + 1);
+	UBYTE temp = abs_operand(CPU_PCE.PC + 2);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
-	CPU.PC += 4;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
+	CPU_PCE.PC += 4;
 	Cycles += 8;
 }
 
 OPCODE_FUNC tstins_absx(void)
 {
-	UBYTE imm_addr = imm_operand(CPU.PC + 1);
-	UBYTE temp = absx_operand(CPU.PC + 2);
+	UBYTE imm_addr = imm_operand(CPU_PCE.PC + 1);
+	UBYTE temp = absx_operand(CPU_PCE.PC + 2);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
-	CPU.PC += 4;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
+	CPU_PCE.PC += 4;
 	Cycles += 8;
 }
 
 OPCODE_FUNC tstins_zp(void)
 {
-	UBYTE imm_addr = imm_operand(CPU.PC + 1);
-	UBYTE temp = zp_operand(CPU.PC + 2);
+	UBYTE imm_addr = imm_operand(CPU_PCE.PC + 1);
+	UBYTE temp = zp_operand(CPU_PCE.PC + 2);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC tstins_zpx(void)
 {
-	UBYTE imm_addr = imm_operand(CPU.PC + 1);
-	UBYTE temp = zpx_operand(CPU.PC + 2);
+	UBYTE imm_addr = imm_operand(CPU_PCE.PC + 1);
+	UBYTE temp = zpx_operand(CPU_PCE.PC + 2);
 
-	CPU.P = (CPU.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
-	CPU.PC += 3;
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | ((temp & imm_addr) ? 0 : FL_Z);
+	CPU_PCE.PC += 3;
 	Cycles += 7;
 }
 
 OPCODE_FUNC tsx(void)
 {
-	CPU.X = CPU.S;
-	chk_flnz_8bit(CPU.S);
-	CPU.PC++;
+	CPU_PCE.X = CPU_PCE.S;
+	chk_flnz_8bit(CPU_PCE.S);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC txa(void)
 {
-	CPU.A = CPU.X;
-	chk_flnz_8bit(CPU.X);
-	CPU.PC++;
+	CPU_PCE.A = CPU_PCE.X;
+	chk_flnz_8bit(CPU_PCE.X);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC txs(void)
 {
-	CPU.P &= ~FL_T;
-	CPU.S = CPU.X;
-	CPU.PC++;
+	CPU_PCE.P &= ~FL_T;
+	CPU_PCE.S = CPU_PCE.X;
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
 OPCODE_FUNC tya(void)
 {
-	CPU.A = CPU.Y;
-	chk_flnz_8bit(CPU.Y);
-	CPU.PC++;
+	CPU_PCE.A = CPU_PCE.Y;
+	chk_flnz_8bit(CPU_PCE.Y);
+	CPU_PCE.PC++;
 	Cycles += 2;
 }
 
@@ -2439,20 +2439,20 @@ OPCODE_FUNC interrupt(int type)
 	// pcetech.txt says the program should clear the irq line by reading 0x1403
 	// however in practice it seems to break many games if we don't clear it?
 
-	TRACE_CPU("CPU interrupt: %d\n", type);
-	push_16bit(CPU.PC);
-	push_8bit(CPU.P);
-	CPU.P &= ~(FL_D|FL_T);
-	CPU.P |= FL_I;
+	TRACE_CPU("CPU_PCE interrupt: %d\n", type);
+	push_16bit(CPU_PCE.PC);
+	push_8bit(CPU_PCE.P);
+	CPU_PCE.P &= ~(FL_D|FL_T);
+	CPU_PCE.P |= FL_I;
 	if ( type & INT_TIMER ) {
-		CPU.irq_lines &= ~INT_TIMER;
-		CPU.PC = pce_read16(VEC_TIMER);
+		CPU_PCE.irq_lines &= ~INT_TIMER;
+		CPU_PCE.PC = pce_read16(VEC_TIMER);
 	} else if (type & INT_IRQ1) {
-		CPU.irq_lines &= ~INT_IRQ1;
-		CPU.PC = pce_read16(VEC_IRQ1);
+		CPU_PCE.irq_lines &= ~INT_IRQ1;
+		CPU_PCE.PC = pce_read16(VEC_IRQ1);
 	} else if (type & INT_IRQ2) {
-		CPU.irq_lines &= ~INT_IRQ2;
-		CPU.PC = pce_read16(VEC_IRQ2);
+		CPU_PCE.irq_lines &= ~INT_IRQ2;
+		CPU_PCE.PC = pce_read16(VEC_IRQ2);
 	}
 	Cycles += 8;
 }

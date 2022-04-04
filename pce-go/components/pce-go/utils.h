@@ -56,7 +56,7 @@
 #endif
 
 #if ENABLE_CPU_TRACING
-#define TRACE_CPU(x...) MESSAGE_TRACE("CPU", x)
+#define TRACE_CPU(x...) MESSAGE_TRACE("CPU_PCE", x)
 #else
 #define TRACE_CPU(x...) {}
 #endif

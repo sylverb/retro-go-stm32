@@ -129,10 +129,10 @@ typedef struct {
 	//
 	int ScrollYDiff;
 
-	// Number of executed CPU cycles
+	// Number of executed CPU_PCE cycles
 	int32_t Cycles;
 
-	// Run CPU until Cycles >= MaxCycles
+	// Run CPU_PCE until Cycles >= MaxCycles
 	int32_t MaxCycles;
 
 	// Value of each of the MMR registers

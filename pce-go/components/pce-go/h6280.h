@@ -28,7 +28,7 @@ typedef struct
 	uint32_t halted;
 } h6280_t;
 
-// CPU Flags:
+// CPU_PCE Flags:
 #define FL_N       0x80
 #define FL_V       0x40
 #define FL_T       0x20
@@ -52,4 +52,4 @@ typedef struct
 #define VEC_IRQ2   0xFFF6
 #define VEC_BRK    0xFFF6
 
-extern h6280_t CPU;
+extern h6280_t CPU_PCE;

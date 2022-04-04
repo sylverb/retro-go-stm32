@@ -292,12 +292,12 @@ void h6280_dump_state(void)
 {
 	MESSAGE_INFO("Current h6280 status:\n");
 
-	MESSAGE_INFO("PC = 0x%04x\n", CPU.PC);
-	MESSAGE_INFO("A = 0x%02x\n", CPU.A);
-	MESSAGE_INFO("X = 0x%02x\n", CPU.X);
-	MESSAGE_INFO("Y = 0x%02x\n", CPU.Y);
-	MESSAGE_INFO("P = 0x%02x\n", CPU.P);
-	MESSAGE_INFO("S = 0x%02x\n", CPU.S);
+	MESSAGE_INFO("PC = 0x%04x\n", CPU_PCE.PC);
+	MESSAGE_INFO("A = 0x%02x\n", CPU_PCE.A);
+	MESSAGE_INFO("X = 0x%02x\n", CPU_PCE.X);
+	MESSAGE_INFO("Y = 0x%02x\n", CPU_PCE.Y);
+	MESSAGE_INFO("P = 0x%02x\n", CPU_PCE.P);
+	MESSAGE_INFO("S = 0x%02x\n", CPU_PCE.S);
 
 	for (int i = 0; i < 8; i++) {
 		MESSAGE_INFO("MMR[%d] = 0x%02x\n", i, PCE.MMR[i]);

@@ -34,17 +34,17 @@ static const struct
 	SVAR_A("RAM", PCE.RAM),      SVAR_A("VRAM", PCE.VRAM),  SVAR_A("SPRAM", PCE.SPRAM),
 	SVAR_A("PAL", PCE.Palette),  SVAR_A("MMR", PCE.MMR),
 
-	// CPU registers
-	SVAR_2("CPU.PC", CPU.PC),    SVAR_1("CPU.A", CPU.A),    SVAR_1("CPU.X", CPU.X),
-	SVAR_1("CPU.Y", CPU.Y),      SVAR_1("CPU.P", CPU.P),    SVAR_1("CPU.S", CPU.S),
+	// CPU_PCE registers
+	SVAR_2("CPU_PCE.PC", CPU_PCE.PC),    SVAR_1("CPU_PCE.A", CPU_PCE.A),    SVAR_1("CPU_PCE.X", CPU_PCE.X),
+	SVAR_1("CPU_PCE.Y", CPU_PCE.Y),      SVAR_1("CPU_PCE.P", CPU_PCE.P),    SVAR_1("CPU_PCE.S", CPU_PCE.S),
 
 	// Misc
 	SVAR_4("Cycles", Cycles),                   SVAR_4("MaxCycles", PCE.MaxCycles),
 	SVAR_1("SF2", PCE.SF2),                     SVAR_2("VBlankFL", PCE.VBlankFL),
 
 	// IRQ
-	SVAR_1("irq_mask", CPU.irq_mask),           SVAR_1("irq_mask_delay", CPU.irq_mask_delay),
-	SVAR_1("irq_lines", CPU.irq_lines),
+	SVAR_1("irq_mask", CPU_PCE.irq_mask),           SVAR_1("irq_mask_delay", CPU_PCE.irq_mask_delay),
+	SVAR_1("irq_lines", CPU_PCE.irq_lines),
 
 	// PSG
 	SVAR_1("psg.ch", PCE.PSG.ch),               SVAR_1("psg.vol", PCE.PSG.volume),
