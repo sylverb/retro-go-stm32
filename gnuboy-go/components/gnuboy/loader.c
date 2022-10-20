@@ -171,7 +171,7 @@ static svar_t svars[] =
 	I4("rtch", &rtc.h),
 	I4("rtcm", &rtc.m),
 	I4("rtcs", &rtc.s),
-	I4("rtct", &rtc.ticks),
+	I4("rtce", &rtc.epoch),
 	I1("rtR8", &rtc.regs[0]),
 	I1("rtR9", &rtc.regs[1]),
 	I1("rtRA", &rtc.regs[2]),

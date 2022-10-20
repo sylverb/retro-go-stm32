@@ -7,11 +7,11 @@
 
 struct rtc
 {
-	int sel, latch;
-	// Ticks (60 = +1s)
-	int ticks;
+	un32 sel, latch;
+	// Epoch time
+	un32 epoch;
 	// Current time
-	int d, h, m, s, flags;
+	un32 d, h, m, s, flags;
 	// Latched time
 	byte regs[8];
 };
@@ -20,11 +20,5 @@ extern struct rtc rtc;
 
 void rtc_latch(byte b);
 void rtc_write(byte b);
-void rtc_save(FILE *f);
-void rtc_load(FILE *f);
-void rtc_tick();
 
 #endif
-
-
-

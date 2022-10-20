@@ -70,7 +70,7 @@ void IRAM_ATTR emu_run(bool draw)
 
 	// sys_vsync();
 
-    rtc_tick();
+    // rtc_tick();
 
 	sound_mix();
 
