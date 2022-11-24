@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_GB
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -899,3 +902,5 @@ void IRAM_ATTR lcd_emulate()
 		}
 	}
 }
+
+#endif

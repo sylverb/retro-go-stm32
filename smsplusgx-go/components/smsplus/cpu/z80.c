@@ -1,3 +1,5 @@
+#include "build/config.h"
+#if defined(ENABLE_EMULATOR_SMS) || defined(ENABLE_EMULATOR_GG) || defined(ENABLE_EMULATOR_COL) || defined(ENABLE_EMULATOR_SG1000)
 /*****************************************************************************
  *
  *   z80.c
@@ -2676,3 +2678,5 @@ int z80_get_elapsed_cycles(void)
 
   return z80_cycle_count;
 }
+
+#endif

@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -846,3 +849,5 @@ void apu_setext(apuext_t *ext)
    if (apu.ext && NULL != apu.ext->init)
       apu.ext->init();
 }
+
+#endif

@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -1561,3 +1564,5 @@ void nes6502_shutdown(void)
 {
    //
 }
+
+#endif

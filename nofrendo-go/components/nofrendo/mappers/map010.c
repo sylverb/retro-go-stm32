@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -159,3 +162,5 @@ mapintf_t map10_intf =
 ** initial revision based on map009.c
 **
 */
+
+#endif

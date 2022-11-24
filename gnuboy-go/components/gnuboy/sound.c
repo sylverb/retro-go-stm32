@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_GB
 #include <string.h>
 
 #include "defs.h"
@@ -450,3 +453,5 @@ void IRAM_ATTR sound_write(byte r, byte b)
 		return;
 	}
 }
+
+#endif

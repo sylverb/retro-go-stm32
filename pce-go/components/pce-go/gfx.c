@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_PCE
 // gfx.c - VDC/VCE Emulation
 //
 #include <stdlib.h>
@@ -590,3 +593,5 @@ gfx_run(void)
 	/* Always call at least once (to handle pending IRQs) */
 	//gfx_irq(-1);
 }
+
+#endif

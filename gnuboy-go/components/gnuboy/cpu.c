@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_GB
 #include "defs.h"
 #include "regs.h"
 #include "hw.h"
@@ -801,3 +804,5 @@ _skip:
 
 	return cycles + -remaining;
 }
+
+#endif

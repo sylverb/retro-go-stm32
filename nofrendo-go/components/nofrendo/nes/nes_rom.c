@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -247,3 +250,5 @@ void rom_free(rominfo_t *rominfo)
       free(rominfo);
    }
 }
+
+#endif

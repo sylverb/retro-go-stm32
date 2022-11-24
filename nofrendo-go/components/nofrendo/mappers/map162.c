@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -170,3 +173,5 @@ mapintf_t map163_intf =
    map_memwrite, /* memory write structure */
    NULL             /* external sound device */
 };
+
+#endif

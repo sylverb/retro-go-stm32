@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_GB
 #include "stdlib.h"
 
 #include "defs.h"
@@ -551,3 +554,5 @@ void mbc_reset()
 	mbc.enableram = 0;
 	mem_updatemap();
 }
+
+#endif

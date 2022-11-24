@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -107,3 +110,5 @@ void input_update(nesinput_type_t input, uint8 state)
 
    nes_inputs[input].state = state;
 }
+
+#endif

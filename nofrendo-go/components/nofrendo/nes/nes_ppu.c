@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_NES
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -934,3 +937,5 @@ void ppu_dumpbg(bitmap_t *bmp, int x_loc, int y_loc)
 {
    //
 }
+
+#endif

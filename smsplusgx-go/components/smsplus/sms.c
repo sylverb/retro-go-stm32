@@ -1,3 +1,5 @@
+#include "build/config.h"
+#if defined(ENABLE_EMULATOR_SMS) || defined(ENABLE_EMULATOR_GG) || defined(ENABLE_EMULATOR_COL) || defined(ENABLE_EMULATOR_SG1000)
 /******************************************************************************
  *  Sega Master System / GameGear Emulator
  *  Copyright (C) 1998-2007  Charles MacDonald
@@ -529,3 +531,5 @@ int sms_irq_callback(int param)
 {
   return 0xFF;
 }
+
+#endif

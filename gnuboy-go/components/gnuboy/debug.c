@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_GB
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -646,3 +649,4 @@ void debug_disassemble(addr a, int c)
 	}
 }
 
+#endif

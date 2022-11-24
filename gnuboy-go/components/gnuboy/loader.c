@@ -1,3 +1,6 @@
+#include "build/config.h"
+
+#ifdef ENABLE_EMULATOR_GB
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1004,3 +1007,5 @@ void loader_init(char *s)
 	gb_rom_load();
 	// sram_load();
 }
+
+#endif
