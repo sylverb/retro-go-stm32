@@ -34,7 +34,7 @@
 #include <nes_input.h>
 #include <osd.h>
 #include <nes.h>
-#if GAME_GENIE == 1
+#if CHEAT_CODES == 1
 #include "game_genie.h"
 #endif
 

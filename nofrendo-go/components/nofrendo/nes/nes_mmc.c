@@ -200,7 +200,7 @@ void mmc_bankptr(int size, uint32 address, int bank, uint8 *ptr)
 void mmc_bankrom(int size, uint32 address, int bank)
 {
    mmc_bankptr(size, address, bank, mmc.prg);
-#if GAME_GENIE == 1
+#if CHEAT_CODES == 1
    gameGeniePatchRom(mem_getbyte, mem_rom_putbyte);
 #endif
 }

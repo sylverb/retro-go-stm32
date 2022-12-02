@@ -154,7 +154,7 @@ int nes_insertcart(const char *filename, const char **game_genie_codes, int game
    if (NULL == nes.rominfo)
       goto _fail;
 
-#if GAME_GENIE == 1
+#if CHEAT_CODES == 1
    gameGenieInitialize(game_genie_codes, game_genie_codes_count);
 #endif
 
@@ -209,7 +209,7 @@ void nes_shutdown(void)
    ppu_shutdown();
    apu_shutdown();
    nes6502_shutdown();
-#if GAME_GENIE == 1
+#if CHEAT_CODES == 1
    gameGenieShutdown();
 #endif
 }
