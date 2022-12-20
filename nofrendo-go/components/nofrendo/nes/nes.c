@@ -38,6 +38,7 @@
 
 #define NES_OVERDRAW (8)
 
+static uint8_t nes_framebuffer[(NES_SCREEN_WIDTH+16)*NES_SCREEN_HEIGHT];
 static uint8_t bitmap_data[2][sizeof(bitmap_t) + (sizeof(uint8 *) * NES_SCREEN_HEIGHT)];
 static bitmap_t *framebuffers[2];
 static nes_t nes;
@@ -240,7 +241,7 @@ void nes_setregion(region_t region)
 
 void bmp_init(bitmap_t *bitmap, int index, int width , int height, int overdraw)
 {
-   bitmap->data = emulator_framebuffer;
+   bitmap->data = nes_framebuffer;
    bitmap->width = NES_SCREEN_WIDTH;
    bitmap->height = NES_SCREEN_HEIGHT;
    bitmap->pitch = NES_SCREEN_WIDTH + (overdraw * 2);
