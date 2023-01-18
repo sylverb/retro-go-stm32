@@ -26,6 +26,7 @@
 
 #include "shared.h"
 #include "hvc.h"
+#include "gw_malloc.h"
 
 /* This buffer used by the render code will also be re-used for saving the state to flash */
 uint32 glob_bp_lut[0x10000];
@@ -216,7 +217,8 @@ void render_init(void)
 
   /* Generate 64k of data for the look up table */
   //uint8 *_lut = malloc(0x10000);
-  static uint8 _lut[0x10000] __attribute__((section (".ahb")));
+//  static uint8 _lut[0x10000] __attribute__((section (".ahb")));
+  uint8 *_lut = ahb_malloc(0x10000);
 
   for(bx = 0; bx < 0x100; bx++)
   {

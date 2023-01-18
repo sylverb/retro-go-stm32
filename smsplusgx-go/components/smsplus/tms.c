@@ -23,14 +23,15 @@
  ******************************************************************************/
 
 #include "shared.h"
+#include "gw_malloc.h"
 
 int text_counter;               /* Text offset counter */
 
-static uint8 mc_lookup[16][256][8] __attribute__((section (".ahb")));    /* Expand BD, PG data into 8-bit pixels (MC) */
-static uint8 tms_lookup[16][256][2] __attribute__((section (".ahb")));   /* Expand BD, PG data into 8-bit pixels (G1,G2) */
-static uint8 tms_obj_lut[16*256] __attribute__((section (".ahb")));      /* Look up priority between SG and display pixels */
-static uint8 txt_lookup[256][2] __attribute__((section (".ahb")));       /* Expand BD, PG data into 8-bit pixels (TX) */
-static uint8 bp_expand[256][8] __attribute__((section (".ahb")));        /* Expand PG data into 8-bit pixels */
+uint8 (*mc_lookup)[256][8];  /* Expand BD, PG data into 8-bit pixels (MC) */
+uint8 (*tms_lookup)[256][2]; /* Expand BD, PG data into 8-bit pixels (G1,G2) */
+uint8 *tms_obj_lut;          /* Look up priority between SG and display pixels */
+uint8 (*txt_lookup)[2];      /* Expand BD, PG data into 8-bit pixels (TX) */
+uint8 (*bp_expand)[8];       /* Expand PG data into 8-bit pixels */
 
 static const uint8 diff_mask[]  = {0x07, 0x07, 0x0F, 0x0F};
 static const uint8 name_mask[]  = {0xFF, 0xFF, 0xFC, 0xFC};
@@ -298,6 +299,12 @@ void make_tms_tables(void)
     int bd, pg, ct;
     int sx, bx;
 
+    mc_lookup = ahb_malloc(sizeof(uint8[16][256][8]));
+    tms_lookup = ahb_malloc(sizeof(uint8[16][256][2]));
+    tms_obj_lut = ahb_malloc(16*256);
+    txt_lookup = ahb_malloc(sizeof(uint8[256][2]));
+    bp_expand = ahb_malloc(sizeof(uint8[256][8]));
+
     for(sx = 0; sx < 16; sx++)
     {
         for(bx = 0; bx < 256; bx++)
@@ -362,7 +369,6 @@ void make_tms_tables(void)
     }
 
     /* Make bitmap data expansion table */
-    memset(bp_expand, 0, sizeof(bp_expand));
     for(i = 0; i < 256; i++)
     {
         for(j = 0; j < 8; j++)
