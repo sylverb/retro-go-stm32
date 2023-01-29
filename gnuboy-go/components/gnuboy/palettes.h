@@ -1,10 +1,10 @@
 #include <stdint.h>
 
-#define GB_DEFAULT_PALETTE { 0x6BDD, 0x3F0F, 0x2588, 0x0882 }
+#define GB_DEFAULT_PALETTE { 0x6BDD, 0x3F12, 0x2588, 0x1882 }
 
 // Our custom colorization palettes
 static const uint16_t dmg_palettes[][4] = {
-    { 0x6BDD, 0x3F0F, 0x2588, 0x0882 }, // GB_DEFAULT_PALETTE **G&W PALETTE
+	{ 0x6BDD, 0x3F12, 0x2588, 0x1882 }, // GB_DEFAULT_PALETTE **G&W PALETTE
 	{ 0x7FFF, 0x5AD6, 0x318C, 0x0000 }, // GB_2BGRAYS_PALETTE
 	{ 0x5BFF, 0x3F0F, 0x222D, 0x10EB }, // GB_LINKSAW_PALETTE
 	{ 0x639E, 0x263A, 0x10D4, 0x2866 }, // GB_NSUPRGB_PALETTE
