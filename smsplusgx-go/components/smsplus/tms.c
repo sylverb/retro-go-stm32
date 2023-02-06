@@ -27,11 +27,11 @@
 
 int text_counter;               /* Text offset counter */
 
-uint8 (*mc_lookup)[256][8];  /* Expand BD, PG data into 8-bit pixels (MC) */
-uint8 (*tms_lookup)[256][2]; /* Expand BD, PG data into 8-bit pixels (G1,G2) */
-uint8 *tms_obj_lut;          /* Look up priority between SG and display pixels */
-uint8 (*txt_lookup)[2];      /* Expand BD, PG data into 8-bit pixels (TX) */
-uint8 (*bp_expand)[8];       /* Expand PG data into 8-bit pixels */
+uint8 (*mc_lookup)[256][8] = NULL;  /* Expand BD, PG data into 8-bit pixels (MC) */
+uint8 (*tms_lookup)[256][2] = NULL; /* Expand BD, PG data into 8-bit pixels (G1,G2) */
+uint8 *tms_obj_lut = NULL;          /* Look up priority between SG and display pixels */
+uint8 (*txt_lookup)[2] = NULL;      /* Expand BD, PG data into 8-bit pixels (TX) */
+uint8 (*bp_expand)[8] = NULL;       /* Expand PG data into 8-bit pixels */
 
 static const uint8 diff_mask[]  = {0x07, 0x07, 0x0F, 0x0F};
 static const uint8 name_mask[]  = {0xFF, 0xFF, 0xFC, 0xFC};
@@ -299,11 +299,16 @@ void make_tms_tables(void)
     int bd, pg, ct;
     int sx, bx;
 
-    mc_lookup = ahb_malloc(sizeof(uint8[16][256][8]));
-    tms_lookup = ahb_malloc(sizeof(uint8[16][256][2]));
-    tms_obj_lut = ahb_malloc(16*256);
-    txt_lookup = ahb_malloc(sizeof(uint8[256][2]));
-    bp_expand = ahb_malloc(sizeof(uint8[256][8]));
+    if (mc_lookup == NULL)
+        mc_lookup = ahb_malloc(sizeof(uint8[16][256][8]));
+    if (tms_lookup == NULL)
+        tms_lookup = ahb_malloc(sizeof(uint8[16][256][2]));
+    if (tms_obj_lut == NULL)
+        tms_obj_lut = ahb_malloc(16*256);
+    if (txt_lookup == NULL)
+        txt_lookup = ahb_malloc(sizeof(uint8[256][2]));
+    if (bp_expand == NULL)
+        bp_expand = ahb_malloc(sizeof(uint8[256][8]));
 
     for(sx = 0; sx < 16; sx++)
     {

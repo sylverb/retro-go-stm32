@@ -140,7 +140,7 @@ static uint32 atex[4] =
 };
 
 /* Pixel look-up table */
-static const uint8 *lut; // )[0x10000];
+static uint8 *lut = NULL;
 
 /* Bitplane to packed pixel LUT */
 static const uint32 *bp_lut; // 0x10000
@@ -218,7 +218,8 @@ void render_init(void)
   /* Generate 64k of data for the look up table */
   //uint8 *_lut = malloc(0x10000);
 //  static uint8 _lut[0x10000] __attribute__((section (".ahb")));
-  uint8 *_lut = ahb_malloc(0x10000);
+  if (lut == NULL)
+    lut = ahb_malloc(0x10000);
 
   for(bx = 0; bx < 0x100; bx++)
   {
@@ -282,10 +283,9 @@ void render_init(void)
       }
 
       /* Store result */
-      _lut[(bx << 8) | (sx)] = c;
+      lut[(bx << 8) | (sx)] = c;
     }
   }
-  lut = _lut;
 
 
   /* Make bitplane to pixel lookup table */
