@@ -30,8 +30,6 @@
 static uint8_t  _GB_ROM_UNPACK_BUFFER[512000];
 #endif
 
-#include "lz4_depack.h"
-#include "miniz.h"
 #include "lzma.h"
 
 #include "rom_manager.h"
@@ -230,8 +228,6 @@ uint8_t banks[BANK_NUM][BANK_SIZE];
 
 enum {
     COMPRESSION_NONE,
-    COMPRESSION_LZ4,
-    COMPRESSION_DEFLATE,
     COMPRESSION_LZMA,
 };
 typedef uint8_t compression_t;
@@ -300,18 +296,6 @@ rom_loadbank_cache(short bank)
 	/* THE BANK IS UNCOMPRESSED AND CAN BE READ DIRECTLY IN ROM */
 	if (bank_to_cache_idx[bank] & _NOT_COMPRESSED) {
         switch(rom_comp_type){
-            case COMPRESSION_LZ4: {
-                OFFSET = gb_rom_comp_bank_offset[bank] + LZ4_FRAME_SIZE;
-
-                /* set the bank address to the right bank address in cache */
-                rom.bank[bank] = (unsigned char *)&GB_ROM_COMP[OFFSET];
-                break;
-            }
-            case COMPRESSION_DEFLATE: {
-                OFFSET = gb_rom_comp_bank_offset[bank] + 5; //header, LEN, NLEN
-                rom.bank[bank] = (unsigned char *)&GB_ROM_COMP[OFFSET];
-                break;
-            }
             case COMPRESSION_LZMA: {
                 assert(bank == 0);
                 OFFSET = gb_rom_comp_bank_offset[bank];
@@ -356,22 +340,6 @@ rom_loadbank_cache(short bank)
 		wdog_refresh();
 
         switch(rom_comp_type){
-            case COMPRESSION_LZ4: {
-                /* uncompress bank to cache_idx */
-                uint32_t lz4_compressed_size;
-
-                memcpy(&lz4_compressed_size, &GB_ROM_COMP[gb_rom_comp_bank_offset[bank]], sizeof lz4_compressed_size);
-                wdog_refresh();
-                lz4_depack(&GB_ROM_COMP[gb_rom_comp_bank_offset[bank]+LZ4_FRAME_SIZE],&GB_ROM_SRAM_CACHE[OFFSET],lz4_compressed_size);
-                break;
-            }
-            case COMPRESSION_DEFLATE: {
-                size_t n_decomp_bytes;
-                n_decomp_bytes = tinfl_decompress_mem_to_mem(&GB_ROM_SRAM_CACHE[OFFSET], BANK_SIZE, &GB_ROM_COMP[gb_rom_comp_bank_offset[bank]], ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank], 0);
-                assert(n_decomp_bytes != TINFL_DECOMPRESS_MEM_TO_MEM_FAILED);
-                assert(n_decomp_bytes == BANK_SIZE);
-                break;
-            }
             case COMPRESSION_LZMA: {
                 size_t n_decomp_bytes;
                 n_decomp_bytes = lzma_inflate(
@@ -443,20 +411,6 @@ void gb_loader_restore_cache() {
             size_t OFFSET = restored_idx * BANK_SIZE;
             wdog_refresh();
             switch(rom_comp_type){
-                case COMPRESSION_LZ4:{
-                    uint32_t lz4_compressed_size;
-
-                    /* refresh the bank */
-                    memcpy(&lz4_compressed_size, &GB_ROM_COMP[gb_rom_comp_bank_offset[bank]], sizeof lz4_compressed_size);
-                    lz4_depack(&GB_ROM_COMP[gb_rom_comp_bank_offset[bank]+LZ4_FRAME_SIZE],&GB_ROM_SRAM_CACHE[OFFSET],lz4_compressed_size);
-                }
-                break;
-                case COMPRESSION_DEFLATE: {
-                    size_t n_decomp_bytes;
-                    n_decomp_bytes = tinfl_decompress_mem_to_mem(&GB_ROM_SRAM_CACHE[OFFSET], BANK_SIZE, &GB_ROM_COMP[gb_rom_comp_bank_offset[bank]], ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank], 0);
-                    assert(n_decomp_bytes != TINFL_DECOMPRESS_MEM_TO_MEM_FAILED);
-                }
-                break;
                 case COMPRESSION_LZMA: {
                     lzma_inflate(
                             &GB_ROM_SRAM_CACHE[OFFSET],
@@ -515,9 +469,7 @@ static void gb_rom_compress_load(){
     const unsigned char *src = ROM_DATA;
 	rom_bank_cache_enabled = false;
 
-    if (memcmp(&src[0], LZ4_MAGIC, LZ4_MAGIC_SIZE) == 0) rom_comp_type = COMPRESSION_LZ4;
-    else if(strcmp(ROM_EXT, "zopfli") == 0) rom_comp_type = COMPRESSION_DEFLATE;
-    else if(strcmp(ROM_EXT, "lzma") == 0) rom_comp_type = COMPRESSION_LZMA;
+    if(strcmp(ROM_EXT, "lzma") == 0) rom_comp_type = COMPRESSION_LZMA;
     else rom_comp_type = COMPRESSION_NONE;
 
     if(rom_comp_type == COMPRESSION_NONE) return;
@@ -561,92 +513,6 @@ static void gb_rom_compress_load(){
     uint32_t bank_idx = 0;
 
     switch(rom_comp_type){
-        case COMPRESSION_LZ4: {
-            /*
-            Parse all LZ4 frames and check it as compressed bank
-            check header compressed size    	  : bank_compressed_size
-            check header uncompressed size  	  : bank_uncompressed_size
-            Determine offset in LZ4 for each bank : gb_rom_bank_offset
-            Decompress all banks for testing the size coherency with lz4_decompressed_size
-            */
-
-            /* LZ4 frame */
-            uint32_t header_size = LZ4_MAGIC_SIZE + LZ4_FLG_SIZE + LZ4_BD_SIZE;
-            uint32_t lz4_offset = header_size;
-            uint32_t lz4_compressed_size = 0;
-            uint32_t lz4_uncompressed_size = 0;
-            uint32_t lz4_result_size = 0;
-
-            while (lz4_offset < ROM_DATA_LENGTH) {
-
-                memcpy(&lz4_uncompressed_size, &GB_ROM_COMP[lz4_offset], sizeof lz4_uncompressed_size);
-                lz4_offset += LZ4_CONTENT_SIZE + LZ4_HC_SIZE;
-
-                /* store Bank offset Tables */
-                gb_rom_comp_bank_offset[bank_idx] = lz4_offset;
-
-                memcpy(&lz4_compressed_size, &GB_ROM_COMP[lz4_offset], sizeof lz4_compressed_size);
-                lz4_offset += LZ4_FRAME_SIZE;
-
-                /* check that the header information is correct */
-                assert( lz4_uncompressed_size == BANK_SIZE );
-
-                if ( (lz4_compressed_size & 0x80000000) != 0) {
-
-                    lz4_compressed_size &= 0x7FFFFFFF;
-                    lz4_result_size = lz4_compressed_size;
-                    bank_to_cache_idx[bank_idx] = _NOT_COMPRESSED;
-                } else {
-                    wdog_refresh();
-                    // use GB_ROM_SRAM_CACHE to check all compressed bank using LZ4 depack */
-                    lz4_result_size = lz4_depack(&GB_ROM_COMP[lz4_offset],&GB_ROM_SRAM_CACHE[0],lz4_compressed_size);
-                }
-
-                /* check that the decompressed bank size is correct */
-                assert ( BANK_SIZE == lz4_result_size );
-
-                /* next LZ4 frame */
-                bank_idx++;
-                lz4_offset += LZ4_ENDMARK_SIZE +  lz4_compressed_size + header_size;
-            }
-            break;
-        }
-        case COMPRESSION_DEFLATE: {
-            tinfl_decompressor decomp;
-            tinfl_status status;
-            size_t src_offset = 0;
-
-            int flags = 0;
-            flags |= TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF;
-
-            for(bank_idx=0; src_offset < ROM_DATA_LENGTH; bank_idx++){
-                wdog_refresh();
-                size_t src_buf_size = ROM_DATA_LENGTH - src_offset; 
-                tinfl_init(&decomp);
-
-                size_t dst_buf_size = available_size;
-
-                gb_rom_comp_bank_offset[bank_idx] = src_offset;
-
-                status = tinfl_decompress(&decomp,
-                        &GB_ROM_COMP[src_offset], &src_buf_size,
-                        &GB_ROM_SRAM_CACHE[0], &GB_ROM_SRAM_CACHE[0], &dst_buf_size,
-                        flags
-                        );
-                assert(status == TINFL_STATUS_DONE);
-                assert(dst_buf_size == BANK_SIZE);
-
-                /* Explicitly check the 3 bit header */
-                if((GB_ROM_COMP[src_offset] & 0x06) == 0){
-                    // Not Compressed
-                    bank_to_cache_idx[bank_idx] = _NOT_COMPRESSED;
-                }
-
-                // src_buf_size now contains how many bytes of the src were transversed
-                src_offset += src_buf_size;
-            }
-            break;
-        }
         case COMPRESSION_LZMA: {
             size_t src_offset = BANK_SIZE;
             unsigned char lzma_heap[LZMA_BUF_SIZE];
