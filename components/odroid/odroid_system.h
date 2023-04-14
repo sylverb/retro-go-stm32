@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 
 #if !defined(ESP_IDF_VERSION_MAJOR)
@@ -208,3 +212,7 @@ void *rg_alloc(size_t size, uint32_t caps);
 void *rg_calloc(size_t nmemb, size_t size);
 void rg_free(void *ptr);
 void *rg_realloc(void *ptr, size_t size);
+
+#ifdef __cplusplus
+}
+#endif
