@@ -10,6 +10,8 @@
 #include "regs.h"
 #include "noise.h"
 
+byte noise15[4096];
+
 static const byte dmgwave[16] =
 {
 	0xac, 0xdd, 0xda, 0x48,
@@ -338,6 +340,23 @@ static inline void s4_init()
 	S4.pos = 0;
 	S4.cnt = 0;
 	S4.encnt = 0;
+}
+
+static inline uint32_t xorshift32(uint32_t *state) {
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+    return x;
+}
+
+void sound_init(){
+	// Populate the noise15 lookup table
+	uint32_t *noise32 = (uint32_t *)noise15;
+	uint32_t state = 0xf7bee213;  // Random initial value
+	for(uint32_t i=0; i < 1024; i++)
+		noise32[i] = xorshift32(&state);
 }
 
 
