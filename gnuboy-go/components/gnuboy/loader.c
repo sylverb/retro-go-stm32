@@ -226,14 +226,6 @@ uint8_t banks[BANK_NUM][BANK_SIZE];
 /* Information to support Compressed ROM using SRAM as cache */
 /*************************************************************/
 
-enum {
-    COMPRESSION_NONE,
-    COMPRESSION_LZMA,
-};
-typedef uint8_t compression_t;
-
-static compression_t rom_comp_type;
-
 /* SRAM memory :  ROM bank cache */
 unsigned char *GB_ROM_SRAM_CACHE;
 
@@ -319,18 +311,15 @@ rom_loadbank_cache(short bank)
 
 		wdog_refresh();
 
-        switch(rom_comp_type){
-            case COMPRESSION_LZMA: {
-                size_t n_decomp_bytes;
-                n_decomp_bytes = lzma_inflate(
-                        &GB_ROM_SRAM_CACHE[OFFSET],
-                        BANK_SIZE ,
-                        &GB_ROM_COMP[gb_rom_comp_bank_offset[bank]],
-                        ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank]
-                        );
-                assert(n_decomp_bytes == BANK_SIZE);
-                break;
-            }
+		{
+			size_t n_decomp_bytes;
+			n_decomp_bytes = lzma_inflate(
+					&GB_ROM_SRAM_CACHE[OFFSET],
+					BANK_SIZE ,
+					&GB_ROM_COMP[gb_rom_comp_bank_offset[bank]],
+					ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank]
+					);
+			assert(n_decomp_bytes == BANK_SIZE);
         }
 
 		/* set the bank address to the right bank address in cache */
@@ -370,8 +359,6 @@ rom_loadbank_cache(short bank)
 when the cache memory was stolen temporary for another operation (like save_state) */
 
 void gb_loader_restore_cache() {
-
-
 	/* bank to be refreshed in the cache */
 	uint32_t bank=0;
 
@@ -389,24 +376,18 @@ void gb_loader_restore_cache() {
 		/* offset in memory cache of requested bank */
 		size_t OFFSET = restored_idx * BANK_SIZE;
 		wdog_refresh();
-		switch(rom_comp_type){
-			case COMPRESSION_LZMA: {
-				lzma_inflate(
-						&GB_ROM_SRAM_CACHE[OFFSET],
-						BANK_SIZE,
-						&GB_ROM_COMP[gb_rom_comp_bank_offset[bank]],
-						ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank]
-						);
-			}
-			break;
-		}
+		lzma_inflate(
+				&GB_ROM_SRAM_CACHE[OFFSET],
+				BANK_SIZE,
+				&GB_ROM_COMP[gb_rom_comp_bank_offset[bank]],
+				ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank]
+				);
 	}
 }
 
 // TODO: Revisit this later as memory might run out when loading
 
 int IRAM_ATTR rom_loadbank(short bank) {
-	const size_t OFFSET = bank * BANK_SIZE;
 	rom_loadbank_cache(bank);
 	return 0;
 }
@@ -418,14 +399,6 @@ uint8_t sram[8192 * 16];
 static void gb_rom_compress_load(){
     /* src pointer to the ROM data in the external flash (raw or compressed) */
     const unsigned char *src = ROM_DATA;
-
-    if(strcmp(ROM_EXT, "lzma") == 0)
-		rom_comp_type = COMPRESSION_LZMA;
-    else
-		rom_comp_type = COMPRESSION_NONE;
-
-    if(rom_comp_type == COMPRESSION_NONE)
-		return;
 
     /* dest pointer to the ROM data in the internal RAM (raw) */
     unsigned char *dest = (unsigned char *)&_GB_ROM_UNPACK_BUFFER;
@@ -466,40 +439,36 @@ static void gb_rom_compress_load(){
     uint32_t bank_idx = 0;
 
 	// Populate gb_rom_comp_bank_offset array
-    switch(rom_comp_type){
-        case COMPRESSION_LZMA: {
-            size_t src_offset = 0;
-            unsigned char lzma_heap[LZMA_BUF_SIZE];
-            ISzAlloc allocs;
-            ELzmaStatus status;
+	size_t src_offset = 0;
+	unsigned char lzma_heap[LZMA_BUF_SIZE];
+	ISzAlloc allocs;
+	ELzmaStatus status;
 
-            lzma_init_allocs(&allocs, lzma_heap);
+	lzma_init_allocs(&allocs, lzma_heap);
 
-            gb_rom_comp_bank_offset[0] = 0;
+	gb_rom_comp_bank_offset[0] = 0;
 
-            for(bank_idx=0; src_offset < ROM_DATA_LENGTH; bank_idx++){
-                wdog_refresh();
-                size_t src_buf_size = ROM_DATA_LENGTH - src_offset; 
-                size_t dst_buf_size = available_size;
-                SRes res; 
+	for(bank_idx=0; src_offset < ROM_DATA_LENGTH; bank_idx++){
+		wdog_refresh();
+		size_t src_buf_size = ROM_DATA_LENGTH - src_offset; 
+		size_t dst_buf_size = available_size;
+		SRes res; 
 
-                gb_rom_comp_bank_offset[bank_idx] = src_offset;
+		gb_rom_comp_bank_offset[bank_idx] = src_offset;
 
-                res = LzmaDecode(
-                    &GB_ROM_SRAM_CACHE[0], &dst_buf_size,
-                    &GB_ROM_COMP[src_offset], &src_buf_size,
-                    lzma_prop_data, 5,
-                    LZMA_FINISH_ANY, &status,
-                    &allocs);
-                assert(res == SZ_OK);
-                assert(status == LZMA_STATUS_FINISHED_WITH_MARK);
-                assert(dst_buf_size == BANK_SIZE);
-                
-                src_offset += src_buf_size; 
-            }
-            break;
-        }
-    }
+		res = LzmaDecode(
+			&GB_ROM_SRAM_CACHE[0], &dst_buf_size,
+			&GB_ROM_COMP[src_offset], &src_buf_size,
+			lzma_prop_data, 5,
+			LZMA_FINISH_ANY, &status,
+			&allocs);
+		assert(res == SZ_OK);
+		assert(status == LZMA_STATUS_FINISHED_WITH_MARK);
+		assert(dst_buf_size == BANK_SIZE);
+		
+		src_offset += src_buf_size; 
+	}
+
     rom_banks_number       = bank_idx;
     printf("Compressed ROM checked!\n");
 }
