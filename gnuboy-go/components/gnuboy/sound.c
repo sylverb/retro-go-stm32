@@ -351,7 +351,7 @@ static inline uint32_t xorshift32(uint32_t *state) {
     return x;
 }
 
-void sound_init(){
+void gnuboy_sound_init(){
 	// Populate the noise15 lookup table
 	uint32_t *noise32 = (uint32_t *)noise15;
 	uint32_t state = 0xf7bee213;  // Random initial value

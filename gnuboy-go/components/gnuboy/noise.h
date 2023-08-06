@@ -10,7 +10,7 @@
     0xb6,0x4a,0x42,0x72,0xd1,0x19,0xaa,0x03,
 };
 
-// nosie15 lookup table is populated in sound_init();
+// noise15 lookup table is populated in sound_init();
 // This saves roughly 4056 bytes of extflash.
 extern byte noise15[4096];
 
