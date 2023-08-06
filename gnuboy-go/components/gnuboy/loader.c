@@ -232,7 +232,6 @@ enum {
 };
 typedef uint8_t compression_t;
 
-static bool rom_bank_cache_enabled;
 static compression_t rom_comp_type;
 
 /* SRAM memory :  ROM bank cache */
@@ -255,10 +254,8 @@ static short rom_banks_number =0;
 
 /* return cache idx from bank
 if _NOT_IN_CACHE, the bank is not in cache
-if _NOT_COMPRESSED, the bank is directly available in ROM
 */
 #define _NOT_IN_CACHE   0x80
-#define _NOT_COMPRESSED 0x40
 static uint8_t bank_to_cache_idx[_MAX_GB_ROM_BANKS];
 
 /* offset of compressed bank (up to 512 banks)
@@ -279,8 +276,7 @@ static uint32_t cache_ts[_MAX_GB_ROM_BANK_IN_CACHE];
 	static uint32_t swap_count=0;
 #endif
 
-/* Function to load bank dynamically from compressed ROM.
- * The bank0 is always uncompressed */
+/* Function to load bank dynamically from compressed ROM. */
 static void
 rom_loadbank_cache(short bank)
 {
@@ -293,30 +289,14 @@ rom_loadbank_cache(short bank)
 		//printf("L:%03d %03d ",bank, bank_to_cache_idx[bank]);
 	#endif
 
-	/* THE BANK IS UNCOMPRESSED AND CAN BE READ DIRECTLY IN ROM */
-	if (bank_to_cache_idx[bank] & _NOT_COMPRESSED) {
-        switch(rom_comp_type){
-            case COMPRESSION_LZMA: {
-                assert(bank == 0);
-                OFFSET = gb_rom_comp_bank_offset[bank];
-                // No frame, will have to implement if we want more than just
-                // bank0 to be not compressed.
-                rom.bank[bank] = (unsigned char *)&GB_ROM_COMP[OFFSET];
-                break;
-            }
-        }
-
-		#ifdef _TRACE_GB_CACHE
-			//printf("Direct\n");
-		#endif
 	/* THE BANK IS NOT IN THE CACHE AND IS COMPRESSED */
-	} else if (bank_to_cache_idx[bank] & _NOT_IN_CACHE) {
+	if (bank_to_cache_idx[bank] & _NOT_IN_CACHE) {
 		/* look for the older bank in cache as a candidate */
 		for (int idx = 0; idx < bank_cache_size; idx++)
 			if (cache_ts[reclaimed_idx] > cache_ts[idx]) reclaimed_idx = idx;
 
-		/* look for the corresponding allocated bank (skip bank0) */
-		for (int bank_idx=1; bank_idx < rom_banks_number; bank_idx++)
+		/* look for the corresponding allocated bank*/
+		for (int bank_idx=0; bank_idx < rom_banks_number; bank_idx++)
 			if (bank_to_cache_idx[bank_idx] == reclaimed_idx) reclaimed_bank = bank_idx;
 
 		/* reclaim the removed bank from the cache if necessary */
@@ -402,61 +382,32 @@ void gb_loader_restore_cache() {
 		bank=0;
 
 		/* look for the corresponding allocated bank */
-		for (int bank_nb=1; bank_nb < rom_banks_number; bank_nb++)
-			if (bank_to_cache_idx[bank_nb] == restored_idx) bank = bank_nb;
+		for (int bank_nb=0; bank_nb < rom_banks_number; bank_nb++)
+			if (bank_to_cache_idx[bank_nb] == restored_idx)
+				bank = bank_nb;
 
-		/* if no allocated bank, the default value 0, it corresponds to bank0, nothing to do in this case */
-		if (bank !=0) {
-            /* offset in memory cache of requested bank */
-            size_t OFFSET = restored_idx * BANK_SIZE;
-            wdog_refresh();
-            switch(rom_comp_type){
-                case COMPRESSION_LZMA: {
-                    lzma_inflate(
-                            &GB_ROM_SRAM_CACHE[OFFSET],
-                            BANK_SIZE,
-                            &GB_ROM_COMP[gb_rom_comp_bank_offset[bank]],
-                            ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank]
-                            );
-                }
-                break;
-            }
-
+		/* offset in memory cache of requested bank */
+		size_t OFFSET = restored_idx * BANK_SIZE;
+		wdog_refresh();
+		switch(rom_comp_type){
+			case COMPRESSION_LZMA: {
+				lzma_inflate(
+						&GB_ROM_SRAM_CACHE[OFFSET],
+						BANK_SIZE,
+						&GB_ROM_COMP[gb_rom_comp_bank_offset[bank]],
+						ROM_DATA_LENGTH - gb_rom_comp_bank_offset[bank]
+						);
+			}
+			break;
 		}
 	}
 }
 
 // TODO: Revisit this later as memory might run out when loading
 
-int IRAM_ATTR rom_loadbank(short bank)
-{
+int IRAM_ATTR rom_loadbank(short bank) {
 	const size_t OFFSET = bank * BANK_SIZE;
-
-#ifdef GB_CACHE_ROM
-	printf("bank_load: loading bank %d.\n", bank);
-	rom.bank[bank] = banks[bank % BANK_NUM];
-	if (rom.bank[bank] == NULL) {
-		for (int i = BANK_NUM-1; i > 0; i--) {
-			if (rom.bank[i]) {
-				printf("bank_load: reclaiming bank %d.\n", i);
-				rom.bank[bank] = rom.bank[i];
-				rom.bank[i] = NULL;
-				break;
-			}
-		}
-	}
-
-
-	// TODO: check bounds (famous last words :D)
-	memcpy(rom.bank[bank], &ROM_DATA[OFFSET], BANK_SIZE);
-#else
-	// cached
-	if (rom_bank_cache_enabled)
-		rom_loadbank_cache(bank);
-	// uncached
-	else
-		rom.bank[bank] = (byte *) &ROM_DATA[OFFSET];
-#endif
+	rom_loadbank_cache(bank);
 	return 0;
 }
 
@@ -467,12 +418,14 @@ uint8_t sram[8192 * 16];
 static void gb_rom_compress_load(){
     /* src pointer to the ROM data in the external flash (raw or compressed) */
     const unsigned char *src = ROM_DATA;
-	rom_bank_cache_enabled = false;
 
-    if(strcmp(ROM_EXT, "lzma") == 0) rom_comp_type = COMPRESSION_LZMA;
-    else rom_comp_type = COMPRESSION_NONE;
+    if(strcmp(ROM_EXT, "lzma") == 0)
+		rom_comp_type = COMPRESSION_LZMA;
+    else
+		rom_comp_type = COMPRESSION_NONE;
 
-    if(rom_comp_type == COMPRESSION_NONE) return;
+    if(rom_comp_type == COMPRESSION_NONE)
+		return;
 
     /* dest pointer to the ROM data in the internal RAM (raw) */
     unsigned char *dest = (unsigned char *)&_GB_ROM_UNPACK_BUFFER;
@@ -512,9 +465,10 @@ static void gb_rom_compress_load(){
     
     uint32_t bank_idx = 0;
 
+	// Populate gb_rom_comp_bank_offset array
     switch(rom_comp_type){
         case COMPRESSION_LZMA: {
-            size_t src_offset = BANK_SIZE;
+            size_t src_offset = 0;
             unsigned char lzma_heap[LZMA_BUF_SIZE];
             ISzAlloc allocs;
             ELzmaStatus status;
@@ -522,9 +476,8 @@ static void gb_rom_compress_load(){
             lzma_init_allocs(&allocs, lzma_heap);
 
             gb_rom_comp_bank_offset[0] = 0;
-            bank_to_cache_idx[0] = _NOT_COMPRESSED;
 
-            for(bank_idx=1; src_offset < ROM_DATA_LENGTH; bank_idx++){
+            for(bank_idx=0; src_offset < ROM_DATA_LENGTH; bank_idx++){
                 wdog_refresh();
                 size_t src_buf_size = ROM_DATA_LENGTH - src_offset; 
                 size_t dst_buf_size = available_size;
@@ -548,7 +501,6 @@ static void gb_rom_compress_load(){
         }
     }
     rom_banks_number       = bank_idx;
-    rom_bank_cache_enabled = true;
     printf("Compressed ROM checked!\n");
 }
 
@@ -557,7 +509,6 @@ static int gb_rom_load()
 	gb_rom_compress_load();
 
 	rom_loadbank(0);
-
 	byte *header = rom.bank[0];
 
 	memcpy(rom.name, header + 0x0134, 16);
@@ -631,9 +582,8 @@ static int gb_rom_load()
 
 	preload=1;
 	printf("loader: Preloading the first %d banks\n", preload);
-	for (int i = 1; i < preload; i++)
-	{
-		rom_loadbank(i);
+	for (int i = 0; i < preload; i++) {
+		rom_loadbank_cache(i);
 	}
 
 	// Apply game-specific hacks
