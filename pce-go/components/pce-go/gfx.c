@@ -461,11 +461,6 @@ gfx_run(void)
 		if (VBlankON) {
 			need_vbi = true;
 		}
-		/* VRAM to SATB DMA */
-		if ( PCE.VDC.satb == DMA_TRANSFER_PENDING || AutoSATBON ) {
-			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
-			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
-		}
 	}
 
 
@@ -529,7 +524,11 @@ gfx_run(void)
 			gfx_irq(VDC_STAT_CR);
 		}
 
-
+		/* VRAM to SATB DMA */
+		if (PCE.VDC.satb == DMA_TRANSFER_PENDING || IO_VDC_REG[DCR].W & 0x0010) {
+			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
+			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
+		}
 
 		if (PCE.VDC.vram == DMA_TRANSFER_PENDING){
 			int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
