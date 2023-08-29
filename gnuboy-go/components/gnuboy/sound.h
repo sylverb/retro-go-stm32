@@ -2,7 +2,6 @@
 #define __SOUND_H__
 
 #include "defs.h"
-#include "noise.h"
 
 struct sndchan
 {
@@ -37,7 +36,6 @@ struct pcm
 extern struct pcm pcm;
 extern struct snd snd;
 
-void sound_init();
 void sound_write(byte r, byte b);
 byte sound_read(byte r);
 void sound_dirty();
