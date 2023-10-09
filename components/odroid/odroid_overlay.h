@@ -32,7 +32,7 @@ struct odroid_dialog_choice {
     bool (*update_cb)(odroid_dialog_choice_t *, odroid_dialog_event_t, uint32_t repeat);
 };
 
-typedef void (*repaint_callback_t)();
+typedef void (*void_callback_t)();
 
 #define ODROID_DIALOG_CHOICE_LAST {0x0F0F0F0F, "LAST", "LAST", 0xFFFF, NULL}
 
@@ -48,14 +48,11 @@ void odroid_overlay_draw_fill_rect(int x, int y, int width, int height, uint16_t
 void odroid_overlay_draw_battery(int x, int y);
 void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *options, int sel);
 
-int odroid_overlay_dialog_live(const char *header, odroid_dialog_choice_t *options, int selected, repaint_callback_t callback);
-int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected_initial);
+int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint);
 int odroid_overlay_confirm(const char *text, bool yes_selected);
 void odroid_overlay_alert(const char *text);
-bool odroid_overlay_dialog_is_open(void);
 
-int odroid_overlay_settings_menu_live(odroid_dialog_choice_t *extra_options, repaint_callback_t callback);
-int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options);
-int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options);
-int odroid_overlay_game_menu(odroid_dialog_choice_t *extra_options);
+int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
+int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
+int odroid_overlay_game_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
 

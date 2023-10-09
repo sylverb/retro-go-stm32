@@ -41,7 +41,7 @@ extern void osd_event(int event);
 extern void osd_vsync(void);
 
 /* input */
-extern void osd_getinput(void);
+extern void osd_getinput(bitmap_t *bmp);
 
 /* get rom data */
 extern unsigned int osd_getromcrc(void);

@@ -99,7 +99,7 @@ void nes_emulate(void)
 
    while (false == nes.poweroff)
    {
-      osd_getinput();
+      osd_getinput(nes.vidbuf);
       renderframe();
 
       if (nes.drawframe)
