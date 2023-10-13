@@ -79,6 +79,9 @@ bool odroid_settings_ActiveGameGenieCodes_is_enabled(uint32_t rom_id, int code_i
 bool odroid_settings_ActiveGameGenieCodes_set(uint32_t rom_id, int code_index, bool enable);
 #endif
 
+bool odroid_settings_DebugMenuDebugClockAlwaysOn_get();
+void odroid_settings_DebugMenuDebugClockAlwaysOn_set(bool value);
+
 /*** Generic functions ***/
 
 void odroid_settings_string_set(const char *key, const char *value);
