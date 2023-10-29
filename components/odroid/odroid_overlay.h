@@ -49,7 +49,7 @@ void odroid_overlay_draw_battery(int x, int y);
 void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *options, int sel);
 
 int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint);
-int odroid_overlay_confirm(const char *text, bool yes_selected);
+int odroid_overlay_confirm(const char *text, bool yes_selected, void_callback_t repaint);
 void odroid_overlay_alert(const char *text);
 
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);

@@ -36,6 +36,7 @@ extern "C" {
 #include "odroid_settings.h"
 
 typedef bool (*state_handler_t)(char *pathName);
+typedef void (*sleep_hook_t)();
 
 enum
 {
@@ -137,6 +138,7 @@ bool odroid_system_emu_load_state(int slot);
 void odroid_system_panic_dialog(const char *reason);
 void odroid_system_panic(const char *reason, const char *file, const char *function) __attribute__((noreturn));
 void odroid_system_halt() __attribute__((noreturn));
+void odroid_system_set_sleep_hook(sleep_hook_t callback);
 void odroid_system_sleep();
 void odroid_system_switch_app(int app) __attribute__((noreturn));
 void odroid_system_reload_app() __attribute__((noreturn));
