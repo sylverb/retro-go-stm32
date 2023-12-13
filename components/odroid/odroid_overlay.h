@@ -34,7 +34,7 @@ struct odroid_dialog_choice {
 
 typedef void (*void_callback_t)();
 
-#define ODROID_DIALOG_CHOICE_LAST {0x0F0F0F0F, "LAST", "LAST", 0xFFFF, NULL}
+#define ODROID_DIALOG_CHOICE_LAST {0x0F0F0F0F, "LAST", (char *)"LAST", 0xFFFF, NULL}
 
 extern odroid_menu_state_t odroid_menu_state;
 
