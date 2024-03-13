@@ -35,7 +35,7 @@ extern "C" {
 #include "odroid_sdcard.h"
 #include "odroid_settings.h"
 
-typedef bool (*state_handler_t)(char *savePathName, char *sramPathName);
+typedef bool (*state_handler_t)(char *pathName);
 typedef void (*sleep_hook_t)();
 
 enum
