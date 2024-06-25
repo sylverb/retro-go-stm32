@@ -35,7 +35,7 @@ extern "C" {
 #include "odroid_sdcard.h"
 #include "odroid_settings.h"
 
-typedef bool (*state_handler_t)(char *savePathName, char *sramPathName);
+typedef bool (*state_handler_t)(char *savePathName, char *sramPathName, int slot);
 typedef void (*sleep_hook_t)();
 
 enum
@@ -132,6 +132,9 @@ typedef struct
 
 void odroid_system_init(int app_id, int sampleRate);
 char* odroid_system_get_path(emu_path_type_t type, const char *romPath);
+void odroid_system_get_save_path(char *path, size_t size, int slot);
+void odroid_system_get_gnw_data_path(char *path, size_t size, int slot);
+void odroid_system_get_sram_path(char *path, size_t size, int slot);
 void odroid_system_emu_init(state_handler_t load, state_handler_t save, netplay_callback_t netplay_cb);
 bool odroid_system_emu_save_state(int slot);
 bool odroid_system_emu_load_state(int slot);
