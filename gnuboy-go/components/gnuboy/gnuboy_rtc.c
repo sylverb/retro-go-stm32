@@ -7,7 +7,6 @@
 #include "defs.h"
 #include "mem.h"
 #include "rtc.h"
-#include "rg_rtc.h"
 
 struct rtc rtc;
 
@@ -17,7 +16,7 @@ void rtc_latch(byte b)
 	{
 		if (!(rtc.flags & 0x40)) // rtc stop
 		{
-			un32 time = (un32)GW_GetUnixTime() - rtc.epoch;
+			un32 time = (un32)time(NULL) - rtc.epoch;
 
 			rtc.s = time % 60;
 			rtc.m = (time / 60) % 60;
@@ -68,7 +67,7 @@ void rtc_write(byte b)
 		break;
 	}
 
-	rtc.epoch = (un32)GW_GetUnixTime() - (rtc.s + (rtc.m * 60) + (rtc.h * 3600) + (rtc.d * 86400));
+	rtc.epoch = (un32)time(NULL) - (rtc.s + (rtc.m * 60) + (rtc.h * 3600) + (rtc.d * 86400));
 }
 
 #endif
