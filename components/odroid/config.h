@@ -1,3 +1,7 @@
+#ifndef RG_PATH_MAX
+#define RG_PATH_MAX 255
+#endif
+
 // Audio
 #define ODROID_I2S_NUM (I2S_NUM_0)
 #define ODROID_AUDIO_VOLUME_MIN 0
@@ -47,7 +51,8 @@
 #define ODROID_PIN_NES_DATA       GPIO_NUM_4
 
 // SD Card Paths
-#define ODROID_BASE_PATH           "/sd"
+#define RG_STORAGE_ROOT            ""
+#define ODROID_BASE_PATH           RG_STORAGE_ROOT
 #define ODROID_BASE_PATH_ROMS      ODROID_BASE_PATH "/roms"
 #define ODROID_BASE_PATH_SAVES     ODROID_BASE_PATH "/odroid/data"
 #define ODROID_BASE_PATH_TEMP      ODROID_BASE_PATH "/odroid/data" // temp

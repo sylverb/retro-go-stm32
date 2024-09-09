@@ -34,6 +34,8 @@ extern "C" {
 #include "odroid_profiler.h"
 #include "odroid_sdcard.h"
 #include "odroid_settings.h"
+#include "rg_storage.h"
+#include "rg_utils.h"
 
 typedef bool (*state_handler_t)(char *savePathName, char *sramPathName, int slot);
 typedef void (*sleep_hook_t)();
