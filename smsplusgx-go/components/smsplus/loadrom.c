@@ -1,5 +1,3 @@
-#include "build/config.h"
-#if defined(ENABLE_EMULATOR_SMS) || defined(ENABLE_EMULATOR_GG) || defined(ENABLE_EMULATOR_COL) || defined(ENABLE_EMULATOR_SG1000)
 /******************************************************************************
  *  Sega Master System / GameGear Emulator
  *  Copyright (C) 1998-2007  Charles MacDonald
@@ -400,5 +398,3 @@ int load_rom(const char *filename)
 
   return 1;
 }
-
-#endif

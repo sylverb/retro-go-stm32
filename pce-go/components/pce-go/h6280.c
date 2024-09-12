@@ -1,6 +1,3 @@
-#include "build/config.h"
-
-#ifdef ENABLE_EMULATOR_PCE
 //  h6280.c - CPU_PCE Emulation
 //
 #include <stdio.h>
@@ -359,5 +356,3 @@ h6280_run(int32_t cycles)
 		}
 	}
 }
-
-#endif

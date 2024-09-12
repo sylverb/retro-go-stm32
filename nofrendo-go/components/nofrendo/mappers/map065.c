@@ -1,6 +1,4 @@
-#include "build/config.h"
-
-#if defined(ENABLE_EMULATOR_NES) && FORCE_NOFRENDO == 1
+#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **

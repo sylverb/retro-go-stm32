@@ -1,6 +1,3 @@
-#include "build/config.h"
-
-#ifdef ENABLE_EMULATOR_GB
 #include <string.h>
 
 #include "defs.h"
@@ -156,5 +153,3 @@ void hw_reset()
 	R_HDMA5 = 0xFF;
 	R_VBK = 0xFE;
 }
-
-#endif

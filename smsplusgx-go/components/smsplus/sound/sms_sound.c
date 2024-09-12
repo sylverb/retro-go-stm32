@@ -1,5 +1,3 @@
-#include "build/config.h"
-#if defined(ENABLE_EMULATOR_SMS) || defined(ENABLE_EMULATOR_GG) || defined(ENABLE_EMULATOR_COL) || defined(ENABLE_EMULATOR_SG1000)
 /******************************************************************************
  *  Sega Master System / GameGear Emulator
  *  Copyright (C) 1998-2007  Charles MacDonald
@@ -298,5 +296,3 @@ void fmunit_write(int offset, int data)
   printf("fmunit_write: FM Not supported write %02x at %04x\n", data, offset);
   // FM_Write(offset, data);
 }
-
-#endif

@@ -1,5 +1,3 @@
-#include "build/config.h"
-#if defined(ENABLE_EMULATOR_SMS) || defined(ENABLE_EMULATOR_GG) || defined(ENABLE_EMULATOR_COL) || defined(ENABLE_EMULATOR_SG1000)
 /*
     SN76489 emulation
     by Maxim in 2001 and 2002
@@ -248,5 +246,3 @@ void SN76489_Update(int which, INT16 **buffer, int length)
         }
     }
 }
-
-#endif

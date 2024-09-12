@@ -1,6 +1,3 @@
-#include "build/config.h"
-
-#ifdef ENABLE_EMULATOR_GB
 #include "stdbool.h"
 #include "stdarg.h"
 #include "defs.h"
@@ -100,5 +97,3 @@ void emu_die(const char *fmt, ...)
 	va_end(ap);
 	abort();
 }
-
-#endif

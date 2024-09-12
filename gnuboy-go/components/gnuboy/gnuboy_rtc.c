@@ -1,6 +1,3 @@
-#include "build/config.h"
-
-#ifdef ENABLE_EMULATOR_GB
 #include <stdio.h>
 #include <time.h>
 
@@ -69,5 +66,3 @@ void rtc_write(byte b)
 
 	rtc.epoch = (un32)time(NULL) - (rtc.s + (rtc.m * 60) + (rtc.h * 3600) + (rtc.d * 86400));
 }
-
-#endif

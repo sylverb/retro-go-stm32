@@ -1,6 +1,3 @@
-#include "build/config.h"
-
-#ifdef ENABLE_EMULATOR_PCE
 // pce.c - Machine emulation (Memory/IO/Timer)
 //
 #include <stdlib.h>
@@ -677,5 +674,3 @@ pce_writeIO(uint16_t A, uint8_t V)
 
     MESSAGE_DEBUG("ignored I/O write: %04x,%02x at PC = %04X\n", A, V, CPU_PCE.PC);
 }
-
-#endif
