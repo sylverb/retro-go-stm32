@@ -13,12 +13,12 @@ void rtc_latch(byte b)
 	{
 		if (!(rtc.flags & 0x40)) // rtc stop
 		{
-			un32 time = (un32)time(NULL) - rtc.epoch;
+			time_t t = time(NULL) - rtc.epoch;
 
-			rtc.s = time % 60;
-			rtc.m = (time / 60) % 60;
-			rtc.h = (time / 3600) % 24;
-			rtc.d = (time / 86400);
+			rtc.s = t % 60;
+			rtc.m = (t / 60) % 60;
+			rtc.h = (t / 3600) % 24;
+			rtc.d = (t / 86400);
 
 			if (rtc.d >= 512)
 				rtc.flags |= 0x80;
