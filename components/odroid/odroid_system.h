@@ -37,7 +37,9 @@ extern "C" {
 #include "rg_storage.h"
 #include "rg_utils.h"
 
-typedef bool (*state_handler_t)(char *savePathName, char *sramPathName, int slot);
+typedef bool (*state_handler_t)(const char *filename);
+typedef bool (*screenshot_handler_t)(const char *filename);
+
 typedef void (*sleep_hook_t)();
 
 enum
@@ -56,11 +58,17 @@ typedef int32_t emu_speedup_t;
 
 typedef struct
 {
+    state_handler_t loadState;
+    state_handler_t saveState;
+    screenshot_handler_t screenshot;
+} handlers_t;
+
+typedef struct
+{
      uint32_t id;
      uint32_t gameId;
      const char *romPath;
-     state_handler_t loadState;
-     state_handler_t saveState;
+     handlers_t handlers;
      emu_speedup_t speedupEnabled;
      int32_t startAction;
 } rg_app_desc_t;
@@ -71,6 +79,10 @@ typedef enum
      ODROID_PATH_SAVE_STATE_1,
      ODROID_PATH_SAVE_STATE_2,
      ODROID_PATH_SAVE_STATE_3,
+     ODROID_PATH_SCREENSHOT,
+     ODROID_PATH_SCREENSHOT_1,
+     ODROID_PATH_SCREENSHOT_2,
+     ODROID_PATH_SCREENSHOT_3,
      ODROID_PATH_SAVE_BACK,
      ODROID_PATH_SAVE_SRAM,
      ODROID_PATH_TEMP_FILE,
@@ -130,6 +142,26 @@ typedef struct
      uint backtrace[32];
 } panic_trace_t;
 
+typedef struct
+{
+    uint8_t id;
+    bool is_used;
+    bool is_lastused;
+    size_t size;
+    time_t mtime;
+    char preview[RG_PATH_MAX];
+    char file[RG_PATH_MAX];
+} rg_emu_slot_t;
+
+typedef struct
+{
+    size_t total;
+    size_t used;
+    rg_emu_slot_t *lastused;
+    rg_emu_slot_t *latest;
+    rg_emu_slot_t slots[];
+} rg_emu_states_t;
+
 #define PANIC_TRACE_MAGIC 0x12345678
 
 void odroid_system_init(int app_id, int sampleRate);
@@ -137,7 +169,8 @@ char* odroid_system_get_path(emu_path_type_t type, const char *romPath);
 void odroid_system_get_save_path(char *path, size_t size, int slot);
 void odroid_system_get_gnw_data_path(char *path, size_t size, int slot);
 void odroid_system_get_sram_path(char *path, size_t size, int slot);
-void odroid_system_emu_init(state_handler_t load, state_handler_t save, netplay_callback_t netplay_cb);
+void odroid_system_emu_init(state_handler_t load, state_handler_t save, screenshot_handler_t screenshot_cb);
+bool odroid_system_screenshot(const char *filename, int width, int height);
 bool odroid_system_emu_save_state(int slot);
 bool odroid_system_emu_load_state(int slot);
 void odroid_system_panic_dialog(const char *reason);
@@ -150,6 +183,8 @@ void odroid_system_reload_app() __attribute__((noreturn));
 void odroid_system_set_boot_app(int slot);
 void odroid_system_set_led(int value);
 void odroid_system_tick(uint skippedFrame, uint fullFrame, uint busyTime);
+rg_emu_states_t *odroid_system_emu_get_states(const char *romPath, size_t slots);
+
 rg_app_desc_t* odroid_system_get_app();
 runtime_stats_t odroid_system_get_stats();
 

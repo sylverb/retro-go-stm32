@@ -7,6 +7,7 @@ typedef enum {
     ODROID_DIALOG_INIT,
     ODROID_DIALOG_PREV,
     ODROID_DIALOG_NEXT,
+    ODROID_DIALOG_FOCUS_GAINED,
     ODROID_DIALOG_ENTER,
 } odroid_dialog_event_t;
 
@@ -55,4 +56,4 @@ void odroid_overlay_alert(const char *text);
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
 int odroid_overlay_game_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
-
+int odroid_savestate_menu(const char *title, const char *rom_path, bool show_preview, void_callback_t repaint);

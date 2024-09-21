@@ -54,7 +54,7 @@
 #define RG_STORAGE_ROOT            ""
 #define ODROID_BASE_PATH           RG_STORAGE_ROOT
 #define ODROID_BASE_PATH_ROMS      ODROID_BASE_PATH "/roms"
-#define ODROID_BASE_PATH_SAVES     ODROID_BASE_PATH "/retro-go/data"
-#define ODROID_BASE_PATH_TEMP      ODROID_BASE_PATH "/retro-go/data" // temp
+#define ODROID_BASE_PATH_SAVES     ODROID_BASE_PATH "/data"
+#define ODROID_BASE_PATH_TEMP      ODROID_BASE_PATH "/data" // temp
 #define ODROID_BASE_PATH_ROMART    ODROID_BASE_PATH "/romart"
-#define ODROID_BASE_PATH_CRC_CACHE ODROID_BASE_PATH "/retro-go/cache/crc"
+#define ODROID_BASE_PATH_CRC_CACHE ODROID_BASE_PATH "/cache/crc"
