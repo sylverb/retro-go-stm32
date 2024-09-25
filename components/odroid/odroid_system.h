@@ -38,7 +38,7 @@ extern "C" {
 #include "rg_utils.h"
 
 typedef bool (*state_handler_t)(const char *filename);
-typedef bool (*screenshot_handler_t)(const char *filename);
+typedef void *(*screenshot_handler_t)(void);
 
 typedef void (*sleep_hook_t)();
 
