@@ -87,7 +87,7 @@ typedef enum
      ODROID_PATH_SAVE_SRAM,
      ODROID_PATH_TEMP_FILE,
      ODROID_PATH_ROM_FILE,
-     ODROID_PATH_ART_FILE,
+     ODROID_PATH_COVER_FILE,
      ODROID_PATH_CRC_CACHE,
 } emu_path_type_t;
 
