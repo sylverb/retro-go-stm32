@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -94,5 +93,3 @@ mapintf_t map228_intf =
     map_memwrite,                  /* Memory write structure */
     NULL                              /* External sound device */
 };
-
-#endif

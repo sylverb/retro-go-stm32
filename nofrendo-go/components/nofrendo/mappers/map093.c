@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -72,5 +71,3 @@ mapintf_t map93_intf =
 ** initial revision
 **
 */
-
-#endif

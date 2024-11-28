@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -108,5 +107,3 @@ void input_update(nesinput_type_t input, uint8 state)
 
    nes_inputs[input].state = state;
 }
-
-#endif

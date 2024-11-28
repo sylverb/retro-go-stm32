@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -248,5 +247,3 @@ void rom_free(rominfo_t *rominfo)
       free(rominfo);
    }
 }
-
-#endif

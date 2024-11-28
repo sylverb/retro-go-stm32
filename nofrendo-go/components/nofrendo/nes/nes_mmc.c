@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -326,5 +325,3 @@ mmc_t *mmc_init(rominfo_t *rominfo)
 
    return &mmc;
 }
-
-#endif

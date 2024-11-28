@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -202,5 +201,3 @@ mapintf_t map85_intf =
    map_memwrite, /* memory write structure */
    NULL
 };
-
-#endif

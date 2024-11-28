@@ -1,4 +1,3 @@
-#if FORCE_NOFRENDO == 1
 /*
 ** Nofrendo (c) 1998-2000 Matthew Conte (matt@conte.com)
 **
@@ -296,5 +295,3 @@ _fail:
    nes_shutdown();
    return false;
 }
-
-#endif
