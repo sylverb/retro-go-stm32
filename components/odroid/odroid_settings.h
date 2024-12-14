@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "rg_emulators.h"
 
 typedef enum
 {
@@ -36,8 +37,8 @@ void odroid_settings_Backlight_set(int32_t value);
 int32_t odroid_settings_StartupApp_get();
 void odroid_settings_StartupApp_set(int32_t value);
 
-void* odroid_settings_StartupFile_get(void);
-void odroid_settings_StartupFile_set(void *value);
+char* odroid_settings_StartupFile_get(void);
+void odroid_settings_StartupFile_set(retro_emulator_file_t *value);
 
 uint16_t odroid_settings_MainMenuTimeoutS_get(void);
 void odroid_settings_MainMenuTimeoutS_set(uint16_t value);
