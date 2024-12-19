@@ -2,6 +2,7 @@
 
 #include "stdbool.h"
 #include "stdint.h"
+#include "rom_manager.h"
 
 typedef enum {
     ODROID_DIALOG_INIT,
@@ -52,6 +53,8 @@ void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *opti
 int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint);
 int odroid_overlay_confirm(const char *text, bool yes_selected, void_callback_t repaint);
 void odroid_overlay_alert(const char *text);
+
+int odroid_overlay_cache_file_in_flash(retro_emulator_file_t *file, void_callback_t repaint);
 
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
