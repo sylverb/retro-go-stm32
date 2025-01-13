@@ -94,3 +94,6 @@ void odroid_settings_int32_set(const char *key, int32_t value);
 
 int32_t odroid_settings_app_int32_get(const char *key, int32_t value_default);
 void odroid_settings_app_int32_set(const char *key, int32_t value);
+
+uint8_t odroid_settings_cpu_oc_level_get(void);
+void odroid_settings_cpu_oc_level_set(uint8_t oc);
