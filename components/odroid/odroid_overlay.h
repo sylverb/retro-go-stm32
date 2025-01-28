@@ -3,6 +3,7 @@
 #include "stdbool.h"
 #include "stdint.h"
 #include "rom_manager.h"
+#include "rg_emulators.h"
 
 typedef enum {
     ODROID_DIALOG_INIT,
