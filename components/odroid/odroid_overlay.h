@@ -55,7 +55,7 @@ int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, i
 int odroid_overlay_confirm(const char *text, bool yes_selected, void_callback_t repaint);
 void odroid_overlay_alert(const char *text);
 
-int odroid_overlay_cache_file_in_flash(retro_emulator_file_t *file);
+uint8_t *odroid_overlay_cache_file_in_flash(const char *file_path, uint32_t *file_size_p, bool byte_swap);
 
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
