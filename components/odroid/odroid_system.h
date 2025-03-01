@@ -90,6 +90,9 @@ typedef enum
      ODROID_PATH_ROM_FILE,
      ODROID_PATH_COVER_FILE,
      ODROID_PATH_CRC_CACHE,
+     ODROID_PATH_CHEAT_PCE,
+     ODROID_PATH_CHEAT_GAME_GENIE,
+     ODROID_PATH_CHEAT_MFC,
 } emu_path_type_t;
 
 typedef enum
