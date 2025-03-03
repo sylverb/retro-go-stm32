@@ -77,8 +77,8 @@ int32_t odroid_settings_DisplayOverscan_get();
 void odroid_settings_DisplayOverscan_set(int32_t value);
 
 #if CHEAT_CODES == 1
-bool odroid_settings_ActiveGameGenieCodes_is_enabled(uint32_t rom_id, int code_index);
-bool odroid_settings_ActiveGameGenieCodes_set(uint32_t rom_id, int code_index, bool enable);
+bool odroid_settings_ActiveGameGenieCodes_is_enabled(char *game_path, int code_index);
+bool odroid_settings_ActiveGameGenieCodes_set(char *game_path, int code_index, bool enable);
 #endif
 
 bool odroid_settings_DebugMenuDebugClockAlwaysOn_get();
