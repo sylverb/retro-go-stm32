@@ -3,7 +3,6 @@
 #include "stdbool.h"
 #include "stdint.h"
 #include "rom_manager.h"
-#include "rg_emulators.h"
 
 typedef enum {
     ODROID_DIALOG_INIT,
@@ -56,6 +55,7 @@ int odroid_overlay_confirm(const char *text, bool yes_selected, void_callback_t 
 void odroid_overlay_alert(const char *text);
 
 uint8_t *odroid_overlay_cache_file_in_flash(const char *file_path, uint32_t *file_size_p, bool byte_swap);
+size_t   odroid_overlay_cache_file_in_ram(const char *file_path, uint8_t *dest_address);
 
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
