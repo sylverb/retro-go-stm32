@@ -39,6 +39,7 @@ extern "C" {
 
 typedef bool (*state_handler_t)(const char *filename);
 typedef void *(*screenshot_handler_t)(void);
+typedef void (*shutdown_handler_t)(void);
 
 typedef void (*sleep_hook_t)();
 
@@ -61,6 +62,7 @@ typedef struct
     state_handler_t loadState;
     state_handler_t saveState;
     screenshot_handler_t screenshot;
+    shutdown_handler_t shutdown;
 } handlers_t;
 
 typedef struct
@@ -174,10 +176,11 @@ char* odroid_system_get_path(emu_path_type_t type, const char *romPath);
 void odroid_system_get_save_path(char *path, size_t size, int slot);
 void odroid_system_get_gnw_data_path(char *path, size_t size, int slot);
 void odroid_system_get_sram_path(char *path, size_t size, int slot);
-void odroid_system_emu_init(state_handler_t load, state_handler_t save, screenshot_handler_t screenshot_cb);
+void odroid_system_emu_init(state_handler_t load_cb, state_handler_t save_cb, screenshot_handler_t screenshot_cb, shutdown_handler_t shutdown_cb);
 bool odroid_system_screenshot(const char *filename, int width, int height);
 bool odroid_system_emu_save_state(int slot);
 bool odroid_system_emu_load_state(int slot);
+void odroid_system_shutdown();
 void odroid_system_panic_dialog(const char *reason);
 void odroid_system_panic(const char *reason, const char *file, const char *function) __attribute__((noreturn));
 void odroid_system_halt() __attribute__((noreturn));
