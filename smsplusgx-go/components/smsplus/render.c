@@ -217,7 +217,7 @@ void render_init(void)
   //uint8 *_lut = malloc(0x10000);
 //  static uint8 _lut[0x10000] __attribute__((section (".ahb")));
   if (lut == NULL)
-    lut = ahb_malloc(0x10000);
+    lut = itc_malloc(0x10000);
 
   for(bx = 0; bx < 0x100; bx++)
   {
