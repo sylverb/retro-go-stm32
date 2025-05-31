@@ -138,7 +138,8 @@ static uint32 atex[4] =
 };
 
 /* Pixel look-up table */
-static uint8 *lut = NULL;
+// itc ram base memory is 0x00000000, so use another value to know is lut is not initialized
+static uint8 *lut = (void *)0xffffffff;
 
 /* Bitplane to packed pixel LUT */
 static const uint32 *bp_lut; // 0x10000
@@ -216,7 +217,7 @@ void render_init(void)
   /* Generate 64k of data for the look up table */
   //uint8 *_lut = malloc(0x10000);
 //  static uint8 _lut[0x10000] __attribute__((section (".ahb")));
-  if (lut == NULL)
+  if (lut == (void *)0xffffffff)
     lut = itc_malloc(0x10000);
 
   for(bx = 0; bx < 0x100; bx++)
