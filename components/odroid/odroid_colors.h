@@ -1,9 +1,5 @@
 #pragma once
 
-#if !defined(GNW_TARGET_ZELDA)
-#define GNW_TARGET_ZELDA 0
-#endif /* GNW_TARGET_ZELDA */
-
 /* -------------------------------------------------------------------------------- */
 /* -- µGUI COLORS                                                                -- */
 /* -- Source: http://www.rapidtables.com/web/color/RGB_Color.htm                 -- */
@@ -150,9 +146,3 @@
 #define C_GW_RED                       0x6000
 #define C_GW_YELLOW                    0xD445
 #define C_GW_OPAQUE_YELLOW             0x5A02
-
-#if GNW_TARGET_ZELDA != 0
-    #define C_GW_MAIN_COLOR            C_DARK_GREEN
-#else 
-    #define C_GW_MAIN_COLOR            C_GW_RED
-#endif /* GNW_TARGET_ZELDA */
