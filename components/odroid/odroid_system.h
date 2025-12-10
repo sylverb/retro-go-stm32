@@ -171,6 +171,13 @@ typedef struct
     rg_emu_slot_t slots[];
 } rg_emu_states_t;
 
+typedef enum
+{
+     SLEEP_SHOW_ANIMATION = 1 << 0,
+     SLEEP_ENTER_SLEEP = 1 << 1,
+     SLEEP_ENTER_STANDBY = 1 << 2,
+} system_sleep_flags_t;
+
 #define PANIC_TRACE_MAGIC 0x12345678
 
 void odroid_system_init(int app_id, int sampleRate);
@@ -188,6 +195,7 @@ void odroid_system_panic(const char *reason, const char *file, const char *funct
 void odroid_system_halt() __attribute__((noreturn));
 void odroid_system_set_sleep_hook(sleep_hook_t callback);
 void odroid_system_sleep();
+void odroid_system_sleep_ex(system_sleep_flags_t flags);
 void odroid_system_switch_app(int app) __attribute__((noreturn));
 void odroid_system_reload_app() __attribute__((noreturn));
 void odroid_system_set_boot_app(int slot);

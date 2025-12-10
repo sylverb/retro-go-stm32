@@ -90,6 +90,8 @@ short odroid_display_queue_update(odroid_video_frame_t *frame, odroid_video_fram
 odroid_display_backlight_t odroid_display_get_backlight();
 void odroid_display_set_backlight(odroid_display_backlight_t level);
 
+uint8_t odroid_display_get_backlight_raw();
+
 odroid_display_scaling_t odroid_display_get_scaling_mode(void);
 void odroid_display_set_scaling_mode(odroid_display_scaling_t mode);
 

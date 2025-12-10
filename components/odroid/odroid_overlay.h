@@ -3,6 +3,7 @@
 #include "stdbool.h"
 #include "stdint.h"
 #include "rom_manager.h"
+#include "odroid_input.h"
 
 typedef enum {
     ODROID_DIALOG_INIT,
@@ -47,7 +48,7 @@ int  odroid_overlay_get_font_width();
 int  odroid_overlay_draw_text(uint16_t x, uint16_t y, uint16_t width, const char *text, uint16_t color, uint16_t color_bg);
 void odroid_overlay_draw_rect(int x, int y, int width, int height, int border, uint16_t color);
 void odroid_overlay_draw_fill_rect(int x, int y, int width, int height, uint16_t color);
-void odroid_overlay_draw_battery(int x, int y);
+void odroid_overlay_draw_battery(odroid_battery_state_t battery, int x, int y);
 void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *options, int sel);
 
 int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint);

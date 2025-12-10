@@ -134,9 +134,9 @@ void odroid_overlay_draw_fill_rect(int x, int y, int width, int height, uint16_t
     }
 }
 
-void odroid_overlay_draw_battery(int x_pos, int y_pos)
+void odroid_overlay_draw_battery(odroid_battery_state_t battery, int x_pos, int y_pos)
 {
-    uint16_t percentage = odroid_input_read_battery().percentage;
+    uint16_t percentage = battery.percentage;
     uint16_t color_fill = C_FOREST_GREEN;
     uint16_t color_border = C_SILVER;
     uint16_t color_empty = C_BLACK;
@@ -514,7 +514,7 @@ static void draw_game_status_bar(runtime_stats_t stats)
     odroid_overlay_draw_fill_rect(0, ODROID_SCREEN_HEIGHT - height, width, height, C_BLACK);
     odroid_overlay_draw_text(0, pad_text, width, header, C_LIGHT_GRAY, C_BLACK);
     odroid_overlay_draw_text(0, ODROID_SCREEN_HEIGHT - height + pad_text, width, bottom, C_LIGHT_GRAY, C_BLACK);
-    odroid_overlay_draw_battery(width - 26, 3);
+    odroid_overlay_draw_battery(odroid_input_read_battery(), width - 26, 3);
 }
 
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options)
