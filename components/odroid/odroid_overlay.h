@@ -66,4 +66,4 @@ size_t   odroid_overlay_cache_file_in_ram(const char *file_path, uint8_t *dest_a
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
 int odroid_overlay_game_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
-int odroid_savestate_menu(const char *title, const char *rom_path, bool show_preview, void_callback_t repaint);
+int odroid_savestate_menu(const char *title, const char *rom_path, bool show_preview, bool skip_on_single_used_slot, void_callback_t repaint);
