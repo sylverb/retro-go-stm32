@@ -178,6 +178,7 @@ typedef enum
      SLEEP_SHOW_LOGO = 1 << 1,
      SLEEP_ENTER_SLEEP = 1 << 2,
      SLEEP_ENTER_STANDBY = 1 << 3,
+     SLEEP_ANIMATION_SLOW = 1 << 4,
      SLEEP_ENTER_SLEEP_WITH_ANIMATION = SLEEP_ENTER_SLEEP | SLEEP_SHOW_ANIMATION
 } system_sleep_flags_t;
 
