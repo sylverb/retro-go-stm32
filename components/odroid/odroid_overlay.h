@@ -25,6 +25,11 @@ typedef enum
     ODROID_MENU_OPEN,
 } odroid_menu_state_t;
 
+typedef enum
+{
+    ODROID_MENU_FLAG_DRAW_ONLY = 1 << 0,
+} odroid_menu_flags_t;
+
 typedef struct odroid_dialog_choice odroid_dialog_choice_t;
 
 struct odroid_dialog_choice {
@@ -51,14 +56,14 @@ void odroid_overlay_draw_fill_rect(int x, int y, int width, int height, uint16_t
 void odroid_overlay_draw_battery(odroid_battery_state_t battery, int x, int y);
 void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *options, int sel);
 
-int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint);
+int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint, odroid_menu_flags_t flags);
 int odroid_overlay_confirm(const char *text, bool yes_selected, void_callback_t repaint);
 void odroid_overlay_alert(const char *text);
 
 uint8_t *odroid_overlay_cache_file_in_flash(const char *file_path, uint32_t *file_size_p, bool byte_swap);
 size_t   odroid_overlay_cache_file_in_ram(const char *file_path, uint8_t *dest_address);
 
-int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
-int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
-int odroid_overlay_game_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint);
+int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
+int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
+int odroid_overlay_game_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
 int odroid_savestate_menu(const char *title, const char *rom_path, bool show_preview, void_callback_t repaint);
