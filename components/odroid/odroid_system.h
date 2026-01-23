@@ -40,9 +40,10 @@ extern "C" {
 typedef bool (*state_handler_t)(const char *filename);
 typedef void *(*screenshot_handler_t)(void);
 typedef void (*shutdown_handler_t)(void);
+typedef void (*sleep_post_wakeup_handler_t)();
 
-typedef void (*sleep_hook_t)();
-typedef void (*sleep_wake_hook_t)();
+typedef void (*sleep_pre_sleep_hook_t)();
+typedef void (*sleep_pre_wakeup_callback_t)();
 
 enum
 {
@@ -64,6 +65,7 @@ typedef struct
     state_handler_t saveState;
     screenshot_handler_t screenshot;
     shutdown_handler_t shutdown;
+    sleep_post_wakeup_handler_t sleep_post_wakeup;
 } handlers_t;
 
 typedef struct
@@ -189,7 +191,7 @@ char* odroid_system_get_path(emu_path_type_t type, const char *romPath);
 void odroid_system_get_save_path(char *path, size_t size, int slot);
 void odroid_system_get_gnw_data_path(char *path, size_t size, int slot);
 void odroid_system_get_sram_path(char *path, size_t size, int slot);
-void odroid_system_emu_init(state_handler_t load_cb, state_handler_t save_cb, screenshot_handler_t screenshot_cb, shutdown_handler_t shutdown_cb);
+void odroid_system_emu_init(state_handler_t load_cb, state_handler_t save_cb, screenshot_handler_t screenshot_cb, shutdown_handler_t shutdown_cb, sleep_post_wakeup_handler_t sleep_post_wakeup_cb);
 bool odroid_system_screenshot(const char *filename, int width, int height);
 bool odroid_system_emu_save_state(int slot);
 bool odroid_system_emu_load_state(int slot);
@@ -197,9 +199,9 @@ void odroid_system_shutdown();
 void odroid_system_panic_dialog(const char *reason);
 void odroid_system_panic(const char *reason, const char *file, const char *function) __attribute__((noreturn));
 void odroid_system_halt() __attribute__((noreturn));
-void odroid_system_set_sleep_hook(sleep_hook_t callback);
+void odroid_system_set_pre_sleep_hook(sleep_pre_sleep_hook_t callback);
 void odroid_system_sleep();
-void odroid_system_sleep_ex(system_sleep_flags_t flags, sleep_wake_hook_t wakeup_callback);
+void odroid_system_sleep_ex(system_sleep_flags_t flags, sleep_pre_wakeup_callback_t pre_wakeup_callback);
 void odroid_system_switch_app(int app) __attribute__((noreturn));
 void odroid_system_reload_app() __attribute__((noreturn));
 void odroid_system_set_boot_app(int slot);
