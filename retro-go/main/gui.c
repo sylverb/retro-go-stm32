@@ -270,7 +270,7 @@ void gui_draw_notice(const char *text, uint16_t color)
 
 void gui_draw_status(tab_t *tab)
 {
-    odroid_overlay_draw_battery(ODROID_SCREEN_WIDTH - 27, 3);
+    odroid_overlay_draw_battery(odroid_input_read_battery(), ODROID_SCREEN_WIDTH - 27, 3);
     odroid_overlay_draw_text(
         IMAGE_LOGO_WIDTH + 11,
         IMAGE_BANNER_HEIGHT + 3,
