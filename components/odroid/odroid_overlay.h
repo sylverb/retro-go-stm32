@@ -55,7 +55,7 @@ void odroid_overlay_draw_rect(int x, int y, int width, int height, int border, u
 void odroid_overlay_draw_fill_rect(int x, int y, int width, int height, uint16_t color);
 void odroid_overlay_draw_battery(odroid_battery_state_t battery, int x, int y);
 void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *options, int sel);
-void odroid_overlay_draw_spinner(int x, int y, float radius, float angle, bool draw_background_box);
+void odroid_overlay_draw_banner_text(int center_x, int center_y, const char *text);
 void odroid_overlay_sleep_pause_banner(void_callback_t repaint, odroid_menu_flags_t flags);
 
 int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint, odroid_menu_flags_t flags);
