@@ -28,6 +28,7 @@ typedef enum
 typedef enum
 {
     ODROID_MENU_FLAG_DRAW_ONLY = 1 << 0,
+    ODROID_MENU_FLAG_NO_BG_DARKEN = 1 << 1,
 } odroid_menu_flags_t;
 
 typedef struct odroid_dialog_choice odroid_dialog_choice_t;
@@ -41,6 +42,7 @@ struct odroid_dialog_choice {
 };
 
 typedef void (*void_callback_t)();
+typedef int (*pause_input_callback_t)(odroid_gamepad_state_t* joystick);
 
 #define ODROID_DIALOG_CHOICE_LAST {0x0F0F0F0F, "LAST", (char *)"LAST", 0xFFFF, NULL}
 
@@ -56,7 +58,7 @@ void odroid_overlay_draw_fill_rect(int x, int y, int width, int height, uint16_t
 void odroid_overlay_draw_battery(odroid_battery_state_t battery, int x, int y);
 void odroid_overlay_draw_dialog(const char *header, odroid_dialog_choice_t *options, int sel);
 void odroid_overlay_draw_banner_text(int center_x, int center_y, const char *text);
-void odroid_overlay_sleep_pause_banner(void_callback_t repaint, odroid_menu_flags_t flags);
+void odroid_overlay_sleep_pause_banner(void_callback_t repaint, odroid_menu_flags_t flags, pause_input_callback_t input_cb);
 
 int odroid_overlay_dialog(const char *header, odroid_dialog_choice_t *options, int selected, void_callback_t repaint, odroid_menu_flags_t flags);
 int odroid_overlay_confirm(const char *text, bool yes_selected, void_callback_t repaint);
