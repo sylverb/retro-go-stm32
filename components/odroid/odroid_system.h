@@ -198,6 +198,7 @@ bool odroid_system_screenshot(const char *filename, int width, int height);
 bool odroid_system_emu_save_state(int slot);
 bool odroid_system_emu_load_state(int slot);
 void odroid_system_shutdown();
+void odroid_system_sram_save();
 void odroid_system_panic_dialog(const char *reason);
 void odroid_system_panic(const char *reason, const char *file, const char *function) __attribute__((noreturn));
 void odroid_system_halt() __attribute__((noreturn));
