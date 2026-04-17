@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "rg_emulators.h"
@@ -48,6 +49,10 @@ void odroid_settings_MainMenuSelectedTab_set(uint16_t value);
 
 uint16_t odroid_settings_MainMenuCursor_get(void);
 void odroid_settings_MainMenuCursor_set(uint16_t value);
+
+/** Persisted ROM browser subfolder (relative to system ROM dir); empty = root. */
+void odroid_settings_MainMenuBrowseSubpath_set(const char *subpath);
+bool odroid_settings_MainMenuBrowseSubpath_get(char *buf, size_t buf_size);
 
 ODROID_START_ACTION odroid_settings_StartAction_get();
 void odroid_settings_StartAction_set(ODROID_START_ACTION value);
