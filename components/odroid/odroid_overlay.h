@@ -66,6 +66,7 @@ void odroid_overlay_alert(const char *text);
 
 uint8_t *odroid_overlay_cache_file_in_flash(const char *file_path, uint32_t *file_size_p, bool byte_swap);
 size_t   odroid_overlay_cache_file_in_ram(const char *file_path, uint8_t *dest_address);
+size_t   odroid_overlay_cache_file_in_ram_with_offset(const char *file_path, uint8_t *dest_address, uint32_t offset);
 
 int odroid_overlay_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
 int odroid_overlay_game_settings_menu(odroid_dialog_choice_t *extra_options, void_callback_t repaint, odroid_menu_flags_t flags);
