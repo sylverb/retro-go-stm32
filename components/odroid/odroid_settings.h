@@ -89,6 +89,10 @@ bool odroid_settings_ActiveGameGenieCodes_set(char *game_path, int code_index, b
 bool odroid_settings_DebugMenuDebugClockAlwaysOn_get();
 void odroid_settings_DebugMenuDebugClockAlwaysOn_set(bool value);
 
+/** Welcome prompt state: 0 = not anchored, 1 = shown, else YYYYMMDD anchor date. */
+uint32_t odroid_settings_WelcomePrompt_get(void);
+void odroid_settings_WelcomePrompt_set(uint32_t value);
+
 /*** Generic functions ***/
 
 void odroid_settings_string_set(const char *key, const char *value);
