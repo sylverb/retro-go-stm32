@@ -14,6 +14,10 @@ PCE_t PCE;
 uint8_t *PageR[8];
 uint8_t *PageW[8];
 
+/* PC Engine CD-ROM2 ($1800-$180F) SCSI target — Core/Src/porting/pce/pce_scsi.c */
+extern uint8_t pce_scsi_read(uint8_t reg);
+extern void    pce_scsi_write(uint8_t reg, uint8_t val);
+
 static bool running = false;
 
 /**
@@ -275,9 +279,9 @@ pce_readIO(uint16_t A)
         MESSAGE_INFO("Arcade Card not supported : 0x%04X\n", A);
         break;
 
-    case 0x1800:                // CD-ROM extention
-    case 0x18C0:                // Super System Card
-        MESSAGE_INFO("CD Emulation not implemented : 0x%04X\n", A);
+    case 0x1800:                // CD-ROM2 / Super System Card
+    case 0x18C0:
+        ret = pce_scsi_read(A & 0x0F);
         break;
     }
 
@@ -663,8 +667,8 @@ pce_writeIO(uint16_t A, uint8_t V)
         MESSAGE_INFO("Arcade Card not supported : %d into 0x%04X\n", V, A);
         return;
 
-    case 0x1800:                /* CD-ROM extention */
-        MESSAGE_INFO("CD Emulation not implemented : %d 0x%04X\n", V, A);
+    case 0x1800:                /* CD-ROM2 / Super System Card */
+        pce_scsi_write(A & 0x0F, V);
         return;
 
     case 0x1F00:                /* Street Fighter 2 Mapper */
