@@ -14,6 +14,11 @@
 
 h6280_t CPU_PCE;
 
+/* DIAG (PCE-CD): per-instruction PC ring hook, defined in the main repo's
+ * pce_scsi.c. Gated by g_pcecd_trace so non-CD systems pay only a flag test. */
+extern int  g_pcecd_trace;
+extern void pce_scsi_pc_tick(uint16_t pc);
+
 /**
  * Reset CPU_PCE
  **/
@@ -80,6 +85,8 @@ h6280_run(int32_t cycles)
 				}
 			}
 			CPU_PCE.irq_mask_delay = CPU_PCE.irq_mask;
+
+			if (g_pcecd_trace) pce_scsi_pc_tick(CPU_PCE.PC);
 
 			UBYTE opcode = imm_operand(CPU_PCE.PC);
 
