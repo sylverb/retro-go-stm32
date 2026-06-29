@@ -281,7 +281,21 @@ pce_readIO(uint16_t A)
 
     case 0x1800:                // CD-ROM2 / Super System Card
     case 0x18C0:
-        ret = pce_scsi_read(A & 0x0F);
+        /* $18C0-$18C7 = Super System Card identification (EX_MEMOPEN signature).
+         * The System Card 3.0 BIOS reads $18C1=$AA / $18C2=$55 (and $18C3=version)
+         * to confirm the extended-RAM hardware is present; absence makes Super
+         * CD-ROM2 games abort. We DO emulate that RAM (banks $68-$7F), so report
+         * the signature. Everything else in $1800-$18FF is the SCSI block. */
+        if ((A & 0xF8) == 0xC0) {
+            switch (A & 0x07) {
+            case 1: ret = 0xAA; break;   // signature lo
+            case 2: ret = 0x55; break;   // signature hi
+            case 3: ret = 0x03; break;   // hardware/version id (Super System Card)
+            default: ret = 0x00; break;
+            }
+        } else {
+            ret = pce_scsi_read(A & 0x0F);
+        }
         break;
     }
 
@@ -668,6 +682,11 @@ pce_writeIO(uint16_t A, uint8_t V)
         return;
 
     case 0x1800:                /* CD-ROM2 / Super System Card */
+        /* $18C0-$18C7 = Super System Card id/unlock block (BIOS writes $AA/$55 to
+         * $18C0 after a successful EX_MEMOPEN). Keep it OUT of the SCSI block so a
+         * write here can't fire a spurious SCSI SEL/ACK. */
+        if ((A & 0xF8) == 0xC0)
+            return;
         pce_scsi_write(A & 0x0F, V);
         return;
 
