@@ -91,6 +91,33 @@ pce_init(void)
     return 0;
 }
 
+/* CD-ROM2 backup RAM, empty-but-formatted image the System Card accepts as valid
+ * backup memory: "HUBM" magic + LE16 0x8800 (2048-byte capacity) + LE16 0x8010
+ * (first free byte). Byte-identical to Mednafen huc.cpp BRAM_Init_String. */
+static const uint8_t PCE_BRAM_MAGIC[8] = { 0x48, 0x55, 0x42, 0x4D, 0x00, 0x88, 0x10, 0x80 };
+
+/* Map BRAM into bank $F7 (read+write, no hardware lock — the System Card always
+ * unlocks before writing, so honouring the lock could only remove a write-protect,
+ * never block a legit save). Fill the non-mirrored 0x800-0x1FFF tail with 0xFF.
+ * Call once from the CD load path, after pce_init(), before reset/run. */
+void pce_bram_init(void)
+{
+    PCE.MemoryMapR[0xF7] = PCE.bram;
+    PCE.MemoryMapW[0xF7] = PCE.bram;
+    memset(PCE.bram + 0x800, 0xFF, 0x2000 - 0x800);
+}
+
+/* If the first 8 bytes are not the HUBM signature (fresh boot, or a missing/corrupt
+ * .bram file), write a valid empty-formatted cabinet so the System Card does not show
+ * "backup memory not initialized". Touches only the low 2KB. */
+void pce_bram_format_if_needed(void)
+{
+    if (memcmp(PCE.bram, PCE_BRAM_MAGIC, 8) != 0) {
+        memset(PCE.bram, 0x00, 0x800);
+        memcpy(PCE.bram, PCE_BRAM_MAGIC, 8);
+    }
+}
+
 
 /**
   * Terminate the emulation loop
