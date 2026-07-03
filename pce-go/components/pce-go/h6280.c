@@ -80,8 +80,27 @@ h6280_run(int32_t cycles)
 			if ( CPU_PCE.irq_lines != 0 ) {
 				uint8_t irq = CPU_PCE.irq_lines & ~CPU_PCE.irq_mask_delay & INT_MASK;
 				if ((CPU_PCE.P & FL_I) == 0 && irq) {
-					interrupt(irq);
-					continue;
+					/* Vector-into-BRK guard: pce-go is not cycle-accurate, so an
+					 * IRQ can land inside a window a phase-locked real machine
+					 * never hits — e.g. Dynastic Hero's loader briefly maps CD
+					 * RAM over the vector page (MPR7=$68) mid-decompression; a
+					 * 7kHz PSG-driver timer tick dispatched there fetches a
+					 * garbage vector whose target byte is BRK ($00) and the CPU
+					 * BRK-self-loops (black screen at boot). No game ever points
+					 * a live vector at BRK, so if the would-be handler's first
+					 * opcode is BRK, hold the IRQ pending instead — it
+					 * dispatches normally a few instructions later when the
+					 * window closes. (IRQ line stays asserted, nothing is lost.) */
+					uint16_t vec = (irq & INT_TIMER) ? VEC_TIMER
+					             : (irq & INT_IRQ1)  ? VEC_IRQ1 : VEC_IRQ2;
+					uint16_t tgt = pce_read16(vec);
+					/* read the target the way opcode FETCH does (PageR): an I/O
+					 * page fetch is the dummy zero page = BRK, while pce_read8
+					 * would return live VCE/IO garbage and miss the guard */
+					if (imm_operand(tgt) != 0x00) {
+						interrupt(irq);
+						continue;
+					}
 				}
 			}
 			CPU_PCE.irq_mask_delay = CPU_PCE.irq_mask;
