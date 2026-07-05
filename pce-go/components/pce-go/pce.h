@@ -118,6 +118,11 @@ typedef struct {
 	uint8_t IOAREA[0x04];    // This will overflow into NULLRAM
 	uint8_t NULLRAM[0x2000];
 
+	// CD-ROM2 backup RAM (BRAM). 2KB live at the first 2K of bank $F7; a full 8KB
+	// page so the pce_read8/write8 fast path (page[a]) can't index out of bounds.
+	// Offsets 0x800-0x1FFF are filled 0xFF and never persisted.
+	uint8_t bram[0x2000];
+
 	// PCE->PC Palette convetion array
 	// Each of the 512 available PCE colors (333 RGB -> 512 colors)
 	// got a correspondance in the 256 fixed colors palette
@@ -250,6 +255,8 @@ extern uint8_t *PageW[8];
 
 int  pce_init(void);
 void pce_reset(bool hard);
+void pce_bram_init(void);
+void pce_bram_format_if_needed(void);
 void pce_term(void);
 void pce_run(void);
 void pce_pause(void);

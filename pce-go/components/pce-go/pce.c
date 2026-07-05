@@ -14,6 +14,10 @@ PCE_t PCE;
 uint8_t *PageR[8];
 uint8_t *PageW[8];
 
+/* PC Engine CD-ROM2 ($1800-$180F) SCSI target — Core/Src/porting/pce/pce_scsi.c */
+extern uint8_t pce_scsi_read(uint8_t reg);
+extern void    pce_scsi_write(uint8_t reg, uint8_t val);
+
 static bool running = false;
 
 /**
@@ -85,6 +89,33 @@ pce_init(void)
     // pce_reset();
 
     return 0;
+}
+
+/* CD-ROM2 backup RAM, empty-but-formatted image the System Card accepts as valid
+ * backup memory: "HUBM" magic + LE16 0x8800 (2048-byte capacity) + LE16 0x8010
+ * (first free byte). Byte-identical to Mednafen huc.cpp BRAM_Init_String. */
+static const uint8_t PCE_BRAM_MAGIC[8] = { 0x48, 0x55, 0x42, 0x4D, 0x00, 0x88, 0x10, 0x80 };
+
+/* Map BRAM into bank $F7 (read+write, no hardware lock — the System Card always
+ * unlocks before writing, so honouring the lock could only remove a write-protect,
+ * never block a legit save). Fill the non-mirrored 0x800-0x1FFF tail with 0xFF.
+ * Call once from the CD load path, after pce_init(), before reset/run. */
+void pce_bram_init(void)
+{
+    PCE.MemoryMapR[0xF7] = PCE.bram;
+    PCE.MemoryMapW[0xF7] = PCE.bram;
+    memset(PCE.bram + 0x800, 0xFF, 0x2000 - 0x800);
+}
+
+/* If the first 8 bytes are not the HUBM signature (fresh boot, or a missing/corrupt
+ * .bram file), write a valid empty-formatted cabinet so the System Card does not show
+ * "backup memory not initialized". Touches only the low 2KB. */
+void pce_bram_format_if_needed(void)
+{
+    if (memcmp(PCE.bram, PCE_BRAM_MAGIC, 8) != 0) {
+        memset(PCE.bram, 0x00, 0x800);
+        memcpy(PCE.bram, PCE_BRAM_MAGIC, 8);
+    }
 }
 
 
@@ -275,9 +306,23 @@ pce_readIO(uint16_t A)
         MESSAGE_INFO("Arcade Card not supported : 0x%04X\n", A);
         break;
 
-    case 0x1800:                // CD-ROM extention
-    case 0x18C0:                // Super System Card
-        MESSAGE_INFO("CD Emulation not implemented : 0x%04X\n", A);
+    case 0x1800:                // CD-ROM2 / Super System Card
+    case 0x18C0:
+        /* $18C0-$18C7 = Super System Card identification (EX_MEMOPEN signature).
+         * The System Card 3.0 BIOS reads $18C1=$AA / $18C2=$55 (and $18C3=version)
+         * to confirm the extended-RAM hardware is present; absence makes Super
+         * CD-ROM2 games abort. We DO emulate that RAM (banks $68-$7F), so report
+         * the signature. Everything else in $1800-$18FF is the SCSI block. */
+        if ((A & 0xF8) == 0xC0) {
+            switch (A & 0x07) {
+            case 1: ret = 0xAA; break;   // signature lo
+            case 2: ret = 0x55; break;   // signature hi
+            case 3: ret = 0x03; break;   // hardware/version id (Super System Card)
+            default: ret = 0x00; break;
+            }
+        } else {
+            ret = pce_scsi_read(A & 0x0F);
+        }
         break;
     }
 
@@ -663,8 +708,13 @@ pce_writeIO(uint16_t A, uint8_t V)
         MESSAGE_INFO("Arcade Card not supported : %d into 0x%04X\n", V, A);
         return;
 
-    case 0x1800:                /* CD-ROM extention */
-        MESSAGE_INFO("CD Emulation not implemented : %d 0x%04X\n", V, A);
+    case 0x1800:                /* CD-ROM2 / Super System Card */
+        /* $18C0-$18C7 = Super System Card id/unlock block (BIOS writes $AA/$55 to
+         * $18C0 after a successful EX_MEMOPEN). Keep it OUT of the SCSI block so a
+         * write here can't fire a spurious SCSI SEL/ACK. */
+        if ((A & 0xF8) == 0xC0)
+            return;
+        pce_scsi_write(A & 0x0F, V);
         return;
 
     case 0x1F00:                /* Street Fighter 2 Mapper */
