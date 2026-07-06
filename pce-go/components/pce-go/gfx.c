@@ -50,6 +50,18 @@ static struct {
 } gfx_context;
 
 
+/* Width of the active display area, clamped to XBUF_WIDTH.
+ * Used in render loops so they never process pixels outside the framebuffer
+ * (important when XBUF_WIDTH > IO_VDC_SCREEN_WIDTH, e.g. 512+32 buffer with
+ * a 256-px game).
+ */
+static inline uint32_t
+gfx_screen_width(void)
+{
+	uint32_t w = IO_VDC_SCREEN_WIDTH;
+	return (w > XBUF_WIDTH) ? XBUF_WIDTH : w;
+}
+
 /*
 	Draw background tiles between two lines
 */
@@ -79,7 +91,7 @@ draw_tiles(uint8_t *screen_buffer, int Y1, int Y2, int scroll_x, int scroll_y)
 	y >>= 3;
 
 	PP = (screen_buffer + XBUF_WIDTH * Y1) - (scroll_x & 7);
-	XW = IO_VDC_SCREEN_WIDTH / 8 + 1;
+	XW = gfx_screen_width() / 8 + 1;
 
 	for (int Line = Y1; Line < Y2; y++) {
 		x = scroll_x / 8;
@@ -249,7 +261,7 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 		// PCE has max of 512 sprites
 		no &= 0x1FF;
 
-		if (y >= Y2 || y + (cgy + 1) * 16 < Y1 || x >= IO_VDC_SCREEN_WIDTH || x + (cgx + 1) * 16 < 0) {
+		if (y >= Y2 || y + (cgy + 1) * 16 < Y1 || x >= (int)gfx_screen_width() || x + (cgx + 1) * 16 < 0) {
 			continue;
 		}
 
@@ -364,7 +376,7 @@ render_lines(int min_line, int max_line)
 
 	// We must fill the region with color 0 first
 	// memset(screen_buffer + (min_line * XBUF_WIDTH), PCE.Palette[0], XBUF_WIDTH * (max_line - min_line + 1));
-	size_t screen_width = IO_VDC_SCREEN_WIDTH;
+	size_t screen_width = gfx_screen_width();
 	for (int y = min_line; y <= max_line; y++) {
 		memset(screen_buffer + (y * XBUF_WIDTH), PCE.Palette[0], screen_width);
 	}
@@ -458,6 +470,13 @@ gfx_run(void)
 		if (VBlankON) {
 			need_vbi = true;
 		}
+		/* SAT DMA fires at VBlankFL (mednafen vdc.cpp ~L1321), not at the fixed
+		 * scanline 256 below — that way sprites are always updated at the right
+		 * moment regardless of the VDC vertical timing configuration. */
+		if (PCE.VDC.satb == DMA_TRANSFER_PENDING || IO_VDC_REG[DCR].W & 0x0010) {
+			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
+			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
+		}
 	}
 
 
@@ -509,7 +528,9 @@ gfx_run(void)
 			line_counter++;
 		}
 	}
-	/* V Blank trigger line */
+	/* V Blank trigger line (scanline 256 = first line after the visible area
+	 * range 14-255). SAT DMA is handled above at VBlankFL; VRAM DMA and other
+	 * end-of-frame work stay here. */
 	else if (scanline == 256) {
 
 		// Draw any lines left in the context
@@ -519,12 +540,6 @@ gfx_run(void)
 		// Trigger interrupts
 		if (SpHitON && sprite_hit_check()) {
 			gfx_irq(VDC_STAT_CR);
-		}
-
-		/* VRAM to SATB DMA */
-		if (PCE.VDC.satb == DMA_TRANSFER_PENDING || IO_VDC_REG[DCR].W & 0x0010) {
-			memcpy(PCE.SPRAM, PCE.VRAM + IO_VDC_REG[SATB].W, 512);
-			PCE.VDC.satb = DMA_TRANSFER_COUNTER + 4;
 		}
 
 		if (PCE.VDC.vram == DMA_TRANSFER_PENDING){
