@@ -396,6 +396,11 @@ pce_writeIO(uint16_t A, uint8_t V)
                  */
                 gfx_latch_context(0);
                 PCE.ScrollYDiff = PCE.Scanline - 1 - IO_VDC_MINLINE;
+                /* Written during the top blanking (before MINLINE): the value
+                 * simply becomes the scroll origin of the frame (mednafen sets
+                 * BG_YOffset = BYR at display start), so no line offset. */
+                if (PCE.ScrollYDiff < 0)
+                    PCE.ScrollYDiff = 0;
                 break;
 
             case MWR:                           // Memory Width Register
@@ -501,10 +506,9 @@ pce_writeIO(uint16_t A, uint8_t V)
                 gfx_latch_context(0);
                 V &= 0x1;
                 PCE.ScrollYDiff = PCE.Scanline - 1 - IO_VDC_MINLINE;
-                if (PCE.ScrollYDiff < 0) {
-                    MESSAGE_DEBUG("PCE.ScrollYDiff went negative when substraction VPR.h/.l (%d,%d)\n",
-                        IO_VDC_REG[VPR].B.h, IO_VDC_REG[VPR].B.l);
-                }
+                /* See LSB case: BYR written before display start has no line offset. */
+                if (PCE.ScrollYDiff < 0)
+                    PCE.ScrollYDiff = 0;
                 break;
 
             case MWR:                           // Memory Width Register

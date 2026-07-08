@@ -146,111 +146,127 @@ draw_tiles(uint8_t *screen_buffer, int Y1, int Y2, int scroll_x, int scroll_y)
 
 
 /*
-	Draw sprite C to framebuffer P
+	Sprite rendering: PCE sprite-to-sprite priority is by SATB index (lowest
+	index wins the pixel) ACROSS both priority classes, and the winning
+	pixel's priority bit then decides sprite-vs-BG. Games rely on this to
+	mask sprites behind BG windows (Ys I&II dialog box: low-index priority-0
+	"mask" sprites hide the higher-index priority-1 heroes behind the BG).
+
+	Like mednafen's spr_linebuf, sprites are first resolved into a buffer
+	(entry = 0x100 | color byte, bit15 = priority) by drawing them from
+	index 63 down to 0 so lower indexes overwrite. The buffer is then
+	applied in two passes around the tiles: priority-0 winners before,
+	priority-1 winners after. To keep memory bounded we process the render
+	region in slices of SPR_SLICE_H lines.
 */
-static void // Do not inline (take advantage of xtensa's windowed registers)
-draw_sprite(uint8_t *P, uint16_t *C, int height, uint16_t attr)
+#define SPR_SLICE_H  16
+#define SPR_BUF_W    (XBUF_WIDTH + 64)	/* 32px slack each side for offscreen sprites */
+#define SPR_XOFS     32
+
+static uint16_t spr_buf[SPR_SLICE_H][SPR_BUF_W];
+static uint16_t spr_rmin[SPR_SLICE_H];	/* dirty x range per row (buffer coords) */
+static uint16_t spr_rmax[SPR_SLICE_H];
+
+/*
+	Decode one 16px-wide sprite pattern row into the winner buffer B.
+	C points at the row inside the pattern cell (planes at +0/+16/+32/+48).
+	Writes overwrite unconditionally: the caller iterates sprites from 63
+	down to 0, so the lowest index ends up winning each pixel.
+*/
+static void // Do not inline
+draw_sprite_row(uint16_t *B, const uint16_t *C, uint16_t flags, uint16_t attr)
 {
 	uint8_t *PAL = &PCE.Palette[256 + ((attr & 0xF) << 4)];
 
-	bool hflip = attr & H_FLIP;
-	int inc = 1;//(attr & V_FLIP) ? -1 : 1;
-    if (attr & V_FLIP) {
-		inc = -1;
-		C = C + height - 1;
+	uint16_t J = C[0] | C[16] | C[32] | C[48];
+	uint32_t L1, L2, L, M;
+
+	if (!J)
+		return;
+
+	M = C[0];
+	L1 = ((M & 0x88) >> 3) | ((M & 0x44) << 6) | ((M & 0x22) << 15) | ((M & 0x11) << 24);
+	L2 = ((M & 0x8800) >> 11) | ((M & 0x4400) >> 2) | ((M & 0x2200) << 7) | ((M & 0x1100) << 16);
+	M = C[16];
+	L1 |= ((M & 0x88) >> 2) | ((M & 0x44) << 7) | ((M & 0x22) << 16) | ((M & 0x11) << 25);
+	L2 |= ((M & 0x8800) >> 10) | ((M & 0x4400) >> 1) | ((M & 0x2200) << 8) | ((M & 0x1100) << 17);
+	M = C[32];
+	L1 |= ((M & 0x88) >> 1) | ((M & 0x44) << 8) | ((M & 0x22) << 17) | ((M & 0x11) << 26);
+	L2 |= ((M & 0x8800) >> 9) | ((M & 0x4400) >> 0) | ((M & 0x2200) << 9) | ((M & 0x1100) << 18);
+	M = C[48];
+	L1 |= ((M & 0x88) >> 0) | ((M & 0x44) << 9) | ((M & 0x22) << 18) | ((M & 0x11) << 27);
+	L2 |= ((M & 0x8800) >> 8) | ((M & 0x4400) << 1) | ((M & 0x2200) << 10) | ((M & 0x1100) << 19);
+
+	if (attr & H_FLIP) {
+		L = L2;
+		if ((J & 0x8000)) B[15] = flags | PAL(1);
+		if ((J & 0x4000)) B[14] = flags | PAL(3);
+		if ((J & 0x2000)) B[13] = flags | PAL(5);
+		if ((J & 0x1000)) B[12] = flags | PAL(7);
+		if ((J & 0x0800)) B[11] = flags | PAL(0);
+		if ((J & 0x0400)) B[10] = flags | PAL(2);
+		if ((J & 0x0200)) B[9]  = flags | PAL(4);
+		if ((J & 0x0100)) B[8]  = flags | PAL(6);
+
+		L = L1;
+		if ((J & 0x80)) B[7] = flags | PAL(1);
+		if ((J & 0x40)) B[6] = flags | PAL(3);
+		if ((J & 0x20)) B[5] = flags | PAL(5);
+		if ((J & 0x10)) B[4] = flags | PAL(7);
+		if ((J & 0x08)) B[3] = flags | PAL(0);
+		if ((J & 0x04)) B[2] = flags | PAL(2);
+		if ((J & 0x02)) B[1] = flags | PAL(4);
+		if ((J & 0x01)) B[0] = flags | PAL(6);
 	}
-	for (int i = 0; i < height; i++, C += inc, P += XBUF_WIDTH) {
+	else {
+		L = L2;
+		if ((J & 0x8000)) B[0] = flags | PAL(1);
+		if ((J & 0x4000)) B[1] = flags | PAL(3);
+		if ((J & 0x2000)) B[2] = flags | PAL(5);
+		if ((J & 0x1000)) B[3] = flags | PAL(7);
+		if ((J & 0x0800)) B[4] = flags | PAL(0);
+		if ((J & 0x0400)) B[5] = flags | PAL(2);
+		if ((J & 0x0200)) B[6] = flags | PAL(4);
+		if ((J & 0x0100)) B[7] = flags | PAL(6);
 
-		uint16_t J = C[0] | C[16] | C[32] | C[48];
-		uint32_t L1, L2, L, M;
-
-		if (!J)
-			continue;
-
-		M = C[0];
-		L1 = ((M & 0x88) >> 3) | ((M & 0x44) << 6) | ((M & 0x22) << 15) | ((M & 0x11) << 24);
-		L2 = ((M & 0x8800) >> 11) | ((M & 0x4400) >> 2) | ((M & 0x2200) << 7) | ((M & 0x1100) << 16);
-		M = C[16];
-		L1 |= ((M & 0x88) >> 2) | ((M & 0x44) << 7) | ((M & 0x22) << 16) | ((M & 0x11) << 25);
-		L2 |= ((M & 0x8800) >> 10) | ((M & 0x4400) >> 1) | ((M & 0x2200) << 8) | ((M & 0x1100) << 17);
-		M = C[32];
-		L1 |= ((M & 0x88) >> 1) | ((M & 0x44) << 8) | ((M & 0x22) << 17) | ((M & 0x11) << 26);
-		L2 |= ((M & 0x8800) >> 9) | ((M & 0x4400) >> 0) | ((M & 0x2200) << 9) | ((M & 0x1100) << 18);
-		M = C[48];
-		L1 |= ((M & 0x88) >> 0) | ((M & 0x44) << 9) | ((M & 0x22) << 18) | ((M & 0x11) << 27);
-		L2 |= ((M & 0x8800) >> 8) | ((M & 0x4400) << 1) | ((M & 0x2200) << 10) | ((M & 0x1100) << 19);
-
-		if (hflip) {
-			L = L2;
-			if ((J & 0x8000)) P[15] = PAL(1);
-			if ((J & 0x4000)) P[14] = PAL(3);
-			if ((J & 0x2000)) P[13] = PAL(5);
-			if ((J & 0x1000)) P[12] = PAL(7);
-			if ((J & 0x0800)) P[11] = PAL(0);
-			if ((J & 0x0400)) P[10] = PAL(2);
-			if ((J & 0x0200)) P[9]  = PAL(4);
-			if ((J & 0x0100)) P[8]  = PAL(6);
-
-			L = L1;
-			if ((J & 0x80)) P[7] = PAL(1);
-			if ((J & 0x40)) P[6] = PAL(3);
-			if ((J & 0x20)) P[5] = PAL(5);
-			if ((J & 0x10)) P[4] = PAL(7);
-			if ((J & 0x08)) P[3] = PAL(0);
-			if ((J & 0x04)) P[2] = PAL(2);
-			if ((J & 0x02)) P[1] = PAL(4);
-			if ((J & 0x01)) P[0] = PAL(6);
-		}
-		else {
-			L = L2;
-			if ((J & 0x8000)) P[0] = PAL(1);
-			if ((J & 0x4000)) P[1] = PAL(3);
-			if ((J & 0x2000)) P[2] = PAL(5);
-			if ((J & 0x1000)) P[3] = PAL(7);
-			if ((J & 0x0800)) P[4] = PAL(0);
-			if ((J & 0x0400)) P[5] = PAL(2);
-			if ((J & 0x0200)) P[6] = PAL(4);
-			if ((J & 0x0100)) P[7] = PAL(6);
-
-			L = L1;
-			if ((J & 0x80)) P[8]  = PAL(1);
-			if ((J & 0x40)) P[9]  = PAL(3);
-			if ((J & 0x20)) P[10] = PAL(5);
-			if ((J & 0x10)) P[11] = PAL(7);
-			if ((J & 0x08)) P[12] = PAL(0);
-			if ((J & 0x04)) P[13] = PAL(2);
-			if ((J & 0x02)) P[14] = PAL(4);
-			if ((J & 0x01)) P[15] = PAL(6);
-		}
+		L = L1;
+		if ((J & 0x80)) B[8]  = flags | PAL(1);
+		if ((J & 0x40)) B[9]  = flags | PAL(3);
+		if ((J & 0x20)) B[10] = flags | PAL(5);
+		if ((J & 0x10)) B[11] = flags | PAL(7);
+		if ((J & 0x08)) B[12] = flags | PAL(0);
+		if ((J & 0x04)) B[13] = flags | PAL(2);
+		if ((J & 0x02)) B[14] = flags | PAL(4);
+		if ((J & 0x01)) B[15] = flags | PAL(6);
 	}
 }
 
 
 /*
-	Draw sprites between two lines
+	Resolve all sprites of the slice [Y1,Y2) into spr_buf.
+	Returns true if at least one priority-1 (foreground) pixel was written.
 */
-static void // Do not inline
-draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
+static bool // Do not inline
+sprites_decode_slice(int Y1, int Y2)
 {
-	// NOTE: At this time we do not respect bg sprites priority over top sprites.
-	// Example: Assume that sprite #2 is priority=0 and sprite #5 is priority=1. If they
-	// overlap then sprite #5 shouldn't be drawn because #2 > #5. But currently it will.
+	bool has_prio1 = false;
 
-	// We iterate sprites in reverse order because earlier sprites have
-	// higher priority and therefore must overwrite later sprites.
-	
+	/* Clear only the ranges dirtied by the previous slice */
+	for (int i = 0; i < SPR_SLICE_H; i++) {
+		if (spr_rmax[i] > spr_rmin[i])
+			memset(&spr_buf[i][spr_rmin[i]], 0, (spr_rmax[i] - spr_rmin[i]) * sizeof(uint16_t));
+		spr_rmin[i] = SPR_BUF_W;
+		spr_rmax[i] = 0;
+	}
+
 	for (int n = 63; n >= 0; n--) {
 		sprite_t *spr = (sprite_t *)PCE.SPRAM + n;
 		uint16_t attr = spr->attr;
-
-		if (((attr >> 7) & 1) != priority)
-			continue;
 
 		int y = (spr->y & 0x3FF) - 64;
 		int x = (spr->x & 0x3FF) - 32;
 		int cgx = (attr >> 8) & 1;
 		int cgy = (attr >> 12) & 3;
-		int inc = (attr & V_FLIP) ? -1 : 1;
 		int no = (spr->no & 0x7FF);
 
 		TRACE_SPR("Sprite 0x%02X : X = %d, Y = %d, attr = %d, no = %d\n", n, x, y, attr, no);
@@ -261,65 +277,82 @@ draw_sprites(uint8_t *screen_buffer, int Y1, int Y2, int priority)
 		// PCE has max of 512 sprites
 		no &= 0x1FF;
 
-		if (y >= Y2 || y + (cgy + 1) * 16 < Y1 || x >= (int)gfx_screen_width() || x + (cgx + 1) * 16 < 0) {
+		int height = (cgy + 1) * 16;
+
+		if (y >= Y2 || y + height <= Y1 || x >= (int)gfx_screen_width() || x + (cgx + 1) * 16 < 0) {
 			continue;
 		}
 
-		uint8_t *P = screen_buffer + (XBUF_WIDTH * y + x);
-		uint16_t *C = PCE.VRAM + (no * 64);
+		/* bit15 = in front of BG, bit8 = opaque marker */
+		uint16_t flags = 0x100 | ((attr & 0x80) ? 0x8000 : 0);
+		if (flags & 0x8000)
+			has_prio1 = true;
 
-		cgy *= 16;
+		const uint16_t *C = PCE.VRAM + (no * 64);
 
-		if (attr & V_FLIP) {
-			P = P + cgy * XBUF_WIDTH;
-			for (int yy = cgy; yy >= 0; yy -= 16) {
-				int h = 16;
+		int r0 = (y < Y1) ? Y1 : y;
+		int r1 = (y + height > Y2) ? Y2 : (y + height);
 
-				if (h > Y2 - y - yy)
-					h = Y2 - y - yy;
+		for (int r = r0; r < r1; r++) {
+			int yo = r - y;
+			if (attr & V_FLIP)
+				yo = height - 1 - yo;
 
-				if (attr & H_FLIP) {
-					for (int j = 0; j <= cgx; j++) {
-						draw_sprite(P + (cgx - j) * 16, C + j * 64, h, attr);
-					}
-				} else {
-					for (int j = 0; j <= cgx; j++) {
-						draw_sprite(P + j * 16, C + j * 64, h, attr);
-					}
-				}
+			/* vertical cell stride is 128 words (mednafen: no |= (y_offset & 0x30) >> 3) */
+			const uint16_t *Crow = C + ((yo >> 4) * 128) + (yo & 15);
+			uint16_t *B = &spr_buf[r - Y1][SPR_XOFS + x];
 
-				P -= h * XBUF_WIDTH;
-				C += (h + 16 * 7);// * inc;
+			for (int j = 0; j <= cgx; j++) {
+				const uint16_t *cell = Crow + (((attr & H_FLIP) ? (cgx - j) : j) * 64);
+				draw_sprite_row(B + j * 16, cell, flags, attr);
+			}
+
+			int bx0 = SPR_XOFS + x;
+			int bx1 = bx0 + (cgx + 1) * 16;
+			if (bx0 < spr_rmin[r - Y1]) spr_rmin[r - Y1] = bx0;
+			if (bx1 > spr_rmax[r - Y1]) spr_rmax[r - Y1] = bx1;
+		}
+	}
+
+	return has_prio1;
+}
+
+
+/*
+	Blit the sprite winners of one priority class to the framebuffer.
+	prio=0 must be called before draw_tiles, prio=1 after.
+*/
+static void // Do not inline
+sprites_apply(uint8_t *screen_buffer, int Y1, int Y2, int prio)
+{
+	int width = gfx_screen_width();
+
+	for (int r = 0; r < Y2 - Y1; r++) {
+		int bmin = spr_rmin[r], bmax = spr_rmax[r];
+		if (bmin >= bmax)
+			continue;
+
+		int x0 = bmin - SPR_XOFS;
+		int x1 = bmax - SPR_XOFS;
+		if (x0 < 0) x0 = 0;
+		if (x1 > width) x1 = width;
+
+		uint8_t *fb = screen_buffer + (Y1 + r) * XBUF_WIDTH;
+		const uint16_t *B = &spr_buf[r][SPR_XOFS];
+
+		if (prio) {
+			for (int x = x0; x < x1; x++) {
+				uint16_t e = B[x];
+				if (e & 0x8000)
+					fb[x] = (uint8_t)e;
 			}
 		} else {
-			for (int yy = 0; yy <= cgy; yy += 16) {
-			int t = Y1 - y - yy;
-			int h = 16;
-
-			if (t > 0) {
-				C += t * inc;
-				h -= t;
-				P += t * XBUF_WIDTH;
-			}
-
-				if (h > Y2 - y - yy)
-					h = Y2 - y - yy;
-
-				if (attr & H_FLIP) {
-					for (int j = 0; j <= cgx; j++) {
-						draw_sprite(P + (cgx - j) * 16, C + j * 64, h, attr);
-					}
-				} else {
-					for (int j = 0; j <= cgx; j++) {
-						draw_sprite(P + j * 16, C + j * 64, h, attr);
-					}
-				}
-
-				P += h * XBUF_WIDTH;
-				C += (h + 16 * 7);// * inc;
+			for (int x = x0; x < x1; x++) {
+				uint16_t e = B[x];
+				if (e && !(e & 0x8000))
+					fb[x] = (uint8_t)e;
 			}
 		}
-
 	}
 }
 
@@ -381,19 +414,28 @@ render_lines(int min_line, int max_line)
 		memset(screen_buffer + (y * XBUF_WIDTH), PCE.Palette[0], screen_width);
 	}
 
-	// Sprites with priority 0 are drawn behind the tiles
-	if (gfx_context.control & 0x40) {
-		draw_sprites(screen_buffer, min_line, max_line, 0);
-	}
+	/* Process the region in slices so the sprite winner buffer stays small.
+	   For each slice: resolve sprite priorities, blit background sprites,
+	   draw the tiles over them, then blit foreground sprites. */
+	for (int Y1 = min_line; Y1 < max_line; Y1 += SPR_SLICE_H) {
+		int Y2 = Y1 + SPR_SLICE_H;
+		if (Y2 > max_line)
+			Y2 = max_line;
 
-	// Draw the background tiles
-	if (gfx_context.control & 0x80) {
-		draw_tiles(screen_buffer, min_line, max_line, gfx_context.scroll_x, gfx_context.scroll_y);
-	}
+		bool has_prio1 = false;
 
-	// Draw regular sprites
-	if (gfx_context.control & 0x40) {
-		draw_sprites(screen_buffer, min_line, max_line, 1);
+		if (gfx_context.control & 0x40) {
+			has_prio1 = sprites_decode_slice(Y1, Y2);
+			sprites_apply(screen_buffer, Y1, Y2, 0);
+		}
+
+		if (gfx_context.control & 0x80) {
+			draw_tiles(screen_buffer, Y1, Y2, gfx_context.scroll_x, gfx_context.scroll_y);
+		}
+
+		if (has_prio1) {
+			sprites_apply(screen_buffer, Y1, Y2, 1);
+		}
 	}
 }
 
@@ -449,6 +491,34 @@ gfx_irq(int type)
 
 
 /*
+	VRAM to VRAM DMA: transfer ~one scanline worth of words.
+	Mednafen (vdc.cpp DoDMA) runs 455 bus cycles per free scanline, one word
+	needing a read cycle + a write cycle => ~227 words per scanline.
+*/
+static void
+vram_dma_run_chunk(void)
+{
+	int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
+	int dst_inc = (IO_VDC_REG[DCR].W & 4) ? -1 : 1;
+
+	for (int i = 0; i < 227; i++) {
+		if (IO_VDC_REG[DISTR].W < 0x8000) {
+			PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
+		}
+		IO_VDC_REG[SOUR].W += src_inc;
+		IO_VDC_REG[DISTR].W += dst_inc;
+		IO_VDC_REG[LENR].W -= 1;
+		if (IO_VDC_REG[LENR].W == 0xFFFF) {
+			PCE.VDC.vram = 0;
+			if (DMAIntON) //generate the interrupt when requested
+				gfx_irq(VDC_STAT_DV);
+			break;
+		}
+	}
+}
+
+
+/*
 	Process one scanline
 */
 void
@@ -493,6 +563,20 @@ gfx_run(void)
 			}
 		}
 
+	}
+
+	/* VRAM to VRAM DMA gets a slice of every scanline where the VDC is not
+	 * fetching the display: all blanking lines, plus "burst mode" (both BG
+	 * and sprites disabled). Mednafen runs DoDMA on every such line; doing
+	 * it only once per frame (old code, scanline 256 only) made big
+	 * transfers ~40x too slow and delayed the DV IRQ by dozens of frames. */
+	if (PCE.VDC.vram == DMA_TRANSFER_PENDING) {
+		bool display_active = (scanline >= 14 && scanline <= 255)
+			&& (scanline >= IO_VDC_MINLINE && scanline <= IO_VDC_MAXLINE)
+			&& (IO_VDC_REG[CR].W & 0xC0);
+		if (!display_active) {
+			vram_dma_run_chunk();
+		}
 	}
 
 	int32_t line_leadin1 = 0;
@@ -542,24 +626,7 @@ gfx_run(void)
 			gfx_irq(VDC_STAT_CR);
 		}
 
-		if (PCE.VDC.vram == DMA_TRANSFER_PENDING){
-			int src_inc = (IO_VDC_REG[DCR].W & 8) ? -1 : 1;
-			int dst_inc = (IO_VDC_REG[DCR].W & 4) ? -1 : 1;
-		    for(int i = 0; i < 455; i++) {//do DMA for approx 1 scanline
-				if (IO_VDC_REG[DISTR].W < 0x8000) {
-					PCE.VRAM[IO_VDC_REG[DISTR].W] = PCE.VRAM[IO_VDC_REG[SOUR].W];
-				}
-				IO_VDC_REG[SOUR].W += src_inc;
-				IO_VDC_REG[DISTR].W += dst_inc;
-				IO_VDC_REG[LENR].W -= 1;
-				if (IO_VDC_REG[LENR].W == 0xFFFF) {
-					PCE.VDC.vram = 0;
-					if (DMAIntON)//generate the interrupt when requested
-						gfx_irq(VDC_STAT_DV);
-					break;
-				}
-			 }
-		}
+		/* VRAM DMA is handled above, once per blanking scanline. */
 
 		/* Frame done, we can now process pending res change. */
 		if (PCE.VDC.mode_chg) {
