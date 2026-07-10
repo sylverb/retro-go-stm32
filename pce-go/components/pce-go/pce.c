@@ -7,6 +7,10 @@
 #include "pce.h"
 #include "gfx.h"
 
+#ifdef PCE_ENABLE_ARCADE_CARD
+#include "arcade_card.h"
+#endif
+
 // Global struct containing our emulated hardware status
 PCE_t PCE;
 
@@ -65,6 +69,10 @@ pce_reset(bool hard)
 
     // Reset CPU_PCE
     h6280_reset();
+
+#ifdef PCE_ENABLE_ARCADE_CARD
+    pce_arcade_card_reset();
+#endif
 }
 
 
@@ -197,6 +205,11 @@ pce_readIO(uint16_t A)
 {
     uint8_t ret = 0xFF; // Open Bus
 
+#ifdef PCE_ENABLE_ARCADE_CARD
+    if ((A & 0x1E00) == 0x1A00)
+        return pce_arcade_card_read(A);
+#endif
+
     // The last read value in 0800-017FF is read from the io buffer
     if (A >= 0x800 && A < 0x1800)
         ret = PCE.io_buffer;
@@ -303,7 +316,9 @@ pce_readIO(uint16_t A)
         break;
 
     case 0x1A00:                // Arcade Card
+#ifndef PCE_ENABLE_ARCADE_CARD
         MESSAGE_INFO("Arcade Card not supported : 0x%04X\n", A);
+#endif
         break;
 
     case 0x1800:                // CD-ROM2 / Super System Card
@@ -340,6 +355,13 @@ inline void
 pce_writeIO(uint16_t A, uint8_t V)
 {
     TRACE_IO("IO Write %02x at %04x\n", V, A);
+
+#ifdef PCE_ENABLE_ARCADE_CARD
+    if ((A & 0x1E00) == 0x1A00) {
+        pce_arcade_card_write(A, V);
+        return;
+    }
+#endif
 
     // The last write value in 0800-017FF is saved in the io buffer
     if (A >= 0x800 && A < 0x1800)
@@ -709,7 +731,9 @@ pce_writeIO(uint16_t A, uint8_t V)
         break;
 
     case 0x1A00:                /* Arcade Card */
+#ifndef PCE_ENABLE_ARCADE_CARD
         MESSAGE_INFO("Arcade Card not supported : %d into 0x%04X\n", V, A);
+#endif
         return;
 
     case 0x1800:                /* CD-ROM2 / Super System Card */

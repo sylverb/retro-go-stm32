@@ -263,12 +263,65 @@ void pce_pause(void);
 void pce_writeIO(uint16_t A, uint8_t V);
 uint8_t pce_readIO(uint16_t A);
 
+#ifdef PCE_ENABLE_ARCADE_CARD
+extern uint8_t PCE_ACAREA_MARKER[1];
+uint8_t pce_arcade_card_phys_read(uint32_t phys_addr);
+void    pce_arcade_card_phys_write(uint32_t phys_addr, uint8_t val);
+#endif
+
 
 /**
  * Inlined Functions
  */
 
 #if USE_MEM_MACROS
+
+#ifdef PCE_ENABLE_ARCADE_CARD
+
+#define pce_read8(addr) ({							\
+	uint16_t a = (addr);							\
+	uint8_t *page = PageR[a >> 13]; 				\
+	(page == PCE.IOAREA) ? pce_readIO(a) :				\
+	(page == PCE_ACAREA_MARKER) ? pce_arcade_card_phys_read(	\
+		((uint32_t)PCE.MMR[a >> 13] << 13) | (a & 0x1FFF)) :	\
+	page[a];							\
+})
+
+#define pce_write8(addr, byte) {					\
+	uint16_t a = (addr), b = (byte); 				\
+	uint8_t *page = PageW[a >> 13]; 				\
+	if (page == PCE.IOAREA) pce_writeIO(a, b);			\
+	else if (page == PCE_ACAREA_MARKER) pce_arcade_card_phys_write( \
+		((uint32_t)PCE.MMR[a >> 13] << 13) | (a & 0x1FFF), b); \
+	else page[a] = b;							    \
+}
+
+#define pce_read16(addr) ({							\
+	uint16_t a = (addr); 							\
+	uint8_t *page16 = PageR[a >> 13];					\
+	(page16 == PCE_ACAREA_MARKER) ?						\
+		((uint16_t)pce_arcade_card_phys_read(			\
+			((uint32_t)PCE.MMR[a >> 13] << 13) | (a & 0x1FFF)) |	\
+		 ((uint16_t)pce_arcade_card_phys_read(			\
+			((uint32_t)PCE.MMR[(a + 1) >> 13] << 13) | ((a + 1) & 0x1FFF)) << 8)) : \
+	*((uint16_t*)(page16 + a));					    \
+})
+
+#define pce_write16(addr, word) {					\
+	uint16_t a = (addr), w = (word); 				\
+	uint8_t *page16w = PageW[a >> 13];					\
+	if (page16w == PCE_ACAREA_MARKER) {				\
+		pce_arcade_card_phys_write(					\
+			((uint32_t)PCE.MMR[a >> 13] << 13) | (a & 0x1FFF),	\
+			(uint8_t)w);						\
+		pce_arcade_card_phys_write(					\
+			((uint32_t)PCE.MMR[(a + 1) >> 13] << 13) | ((a + 1) & 0x1FFF), \
+			(uint8_t)(w >> 8));					\
+	} else								\
+		*((uint16_t*)(page16w + a)) = w;			    \
+}
+
+#else /* !PCE_ENABLE_ARCADE_CARD */
 
 #define pce_read8(addr) ({							\
 	uint16_t a = (addr);							\
@@ -290,8 +343,10 @@ uint8_t pce_readIO(uint16_t A);
 
 #define pce_write16(addr, word) {					\
 	uint16_t a = (addr), w = (word); 				\
-	*((uint16_t*)(PageR[a >> 13] + a)) = w;		    \
+	*((uint16_t*)(PageW[a >> 13] + a)) = w;		    \
 }
+
+#endif /* PCE_ENABLE_ARCADE_CARD */
 
 #else
 
@@ -338,6 +393,15 @@ pce_bank_set(uint8_t P, uint8_t V)
 	//TRACE_IO("Bank switching (MMR[%d] = %d)\n", P, V);
 
 	PCE.MMR[P] = V;
+#ifdef PCE_ENABLE_ARCADE_CARD
+	PageR[P] = (PCE.MemoryMapR[V] == PCE.IOAREA) ? (PCE.IOAREA) :
+	           (PCE.MemoryMapR[V] == PCE_ACAREA_MARKER) ? (PCE_ACAREA_MARKER) :
+	           (PCE.MemoryMapR[V] - P * 0x2000);
+	PageW[P] = (PCE.MemoryMapW[V] == PCE.IOAREA) ? (PCE.IOAREA) :
+	           (PCE.MemoryMapW[V] == PCE_ACAREA_MARKER) ? (PCE_ACAREA_MARKER) :
+	           (PCE.MemoryMapW[V] - P * 0x2000);
+#else
 	PageR[P] = (PCE.MemoryMapR[V] == PCE.IOAREA) ? (PCE.IOAREA) : (PCE.MemoryMapR[V] - P * 0x2000);
 	PageW[P] = (PCE.MemoryMapW[V] == PCE.IOAREA) ? (PCE.IOAREA) : (PCE.MemoryMapW[V] - P * 0x2000);
+#endif
 }
