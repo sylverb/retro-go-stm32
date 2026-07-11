@@ -453,6 +453,12 @@ gfx_reset(bool hard)
 {
 	last_line_counter = 0;
 	line_counter = 0;
+	if (hard) {
+		gfx_context.latched = 0;
+		gfx_context.scroll_x = 0;
+		gfx_context.scroll_y = 0;
+		gfx_context.control = 0;
+	}
 }
 
 
@@ -533,6 +539,11 @@ gfx_run(void)
    		if(PCE.VBlankFL > 261)
     		PCE.VBlankFL = 261;
 
+		/* Apply pending VDC timing before the first visible line is drawn. */
+		if (PCE.VDC.mode_chg) {
+			PCE.VDC.mode_chg = 0;
+			osd_gfx_set_mode(IO_VDC_SCREEN_WIDTH, IO_VDC_SCREEN_HEIGHT);
+		}
 	}
 
 
@@ -617,6 +628,13 @@ gfx_run(void)
 	 * end-of-frame work stay here. */
 	else if (scanline == 256) {
 
+		/* Flush pending mode before the last render batch so stale pixels from
+		 * the previous FB offset cannot flash when the VDC viewport changes. */
+		if (PCE.VDC.mode_chg) {
+			PCE.VDC.mode_chg = 0;
+			osd_gfx_set_mode(IO_VDC_SCREEN_WIDTH, IO_VDC_SCREEN_HEIGHT);
+		}
+
 		// Draw any lines left in the context
 		gfx_latch_context(0);
 		render_lines(last_line_counter, line_counter);
@@ -627,15 +645,6 @@ gfx_run(void)
 		}
 
 		/* VRAM DMA is handled above, once per blanking scanline. */
-
-		/* Frame done, we can now process pending res change. */
-		if (PCE.VDC.mode_chg) {
-			TRACE_GFX("Changing mode: VDS = %04x VSW = %04x VDW = %04x VCR = %04x\n",
-				IO_VDC_REG[VPR].B.h, IO_VDC_REG[VPR].B.l,
-				IO_VDC_REG[VDW].W, IO_VDC_REG[VCR].W);
-			PCE.VDC.mode_chg = 0;
-			osd_gfx_set_mode(IO_VDC_SCREEN_WIDTH, IO_VDC_SCREEN_HEIGHT);
-		}
 	}
 	/* V Blank area */
 	else {
