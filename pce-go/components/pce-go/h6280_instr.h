@@ -2320,7 +2320,7 @@ OPCODE_FUNC trb_abs(void)
 	UBYTE temp = pce_read8(temp_addr);
 	UBYTE temp1 = (~CPU_PCE.A) & temp;
 
-	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | (temp1 ? 0 : FL_Z);
 	pce_write8(temp_addr, temp1);
 	CPU_PCE.PC += 3;
 	Cycles += 7;
@@ -2332,7 +2332,7 @@ OPCODE_FUNC trb_zp(void)
 	UBYTE temp = get_8bit_zp(zp_addr);
 	UBYTE temp1 = (~CPU_PCE.A) & temp;
 
-	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | (temp1 ? 0 : FL_Z);
 	put_8bit_zp(zp_addr, temp1);
 	CPU_PCE.PC += 2;
 	Cycles += 6;
@@ -2344,7 +2344,7 @@ OPCODE_FUNC tsb_abs(void)
 	UBYTE temp = pce_read8(temp_addr);
 	UBYTE temp1 = CPU_PCE.A | temp;
 
-	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | (temp1 ? 0 : FL_Z);
 	pce_write8(temp_addr, temp1);
 	CPU_PCE.PC += 3;
 	Cycles += 7;
@@ -2356,7 +2356,7 @@ OPCODE_FUNC tsb_zp(void)
 	UBYTE temp = get_8bit_zp(zp_addr);
 	UBYTE temp1 = CPU_PCE.A | temp;
 
-	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp1 & (FL_N | FL_V)) | ((temp & CPU_PCE.A) ? 0 : FL_Z);
+	CPU_PCE.P = (CPU_PCE.P & ~(FL_N | FL_V | FL_T | FL_Z)) | (temp & (FL_N | FL_V)) | (temp1 ? 0 : FL_Z);
 	put_8bit_zp(zp_addr, temp1);
 	CPU_PCE.PC += 2;
 	Cycles += 6;
