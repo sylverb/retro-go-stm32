@@ -42,6 +42,7 @@ typedef void *(*screenshot_handler_t)(void);
 typedef void (*shutdown_handler_t)(void);
 typedef void (*sleep_post_wakeup_handler_t)();
 typedef void (*sram_save_handler_t)(void);
+typedef void (*cheat_update_handler_t)(void);
 
 typedef void (*sleep_pre_sleep_hook_t)();
 typedef void (*sleep_pre_wakeup_callback_t)();
@@ -68,6 +69,9 @@ typedef struct
     shutdown_handler_t shutdown;
     sleep_post_wakeup_handler_t sleep_post_wakeup;
     sram_save_handler_t sram_save;
+    /* Optional: apply currently-enabled cheats to the running core.
+     * Non-NULL ⇒ pause menu shows the Cheat Codes entry. */
+    cheat_update_handler_t cheat_update;
 } handlers_t;
 
 typedef struct
@@ -193,7 +197,7 @@ char* odroid_system_get_path(emu_path_type_t type, const char *romPath);
 void odroid_system_get_save_path(char *path, size_t size, int slot);
 void odroid_system_get_gnw_data_path(char *path, size_t size, int slot);
 void odroid_system_get_sram_path(char *path, size_t size, int slot);
-void odroid_system_emu_init(state_handler_t load_cb, state_handler_t save_cb, screenshot_handler_t screenshot_cb, shutdown_handler_t shutdown_cb, sleep_post_wakeup_handler_t sleep_post_wakeup_cb, sram_save_handler_t sram_save_cb);
+void odroid_system_emu_init(state_handler_t load_cb, state_handler_t save_cb, screenshot_handler_t screenshot_cb, shutdown_handler_t shutdown_cb, sleep_post_wakeup_handler_t sleep_post_wakeup_cb, sram_save_handler_t sram_save_cb, cheat_update_handler_t cheat_update_cb);
 bool odroid_system_screenshot(const char *filename, int width, int height);
 bool odroid_system_emu_save_state(int slot);
 bool odroid_system_emu_load_state(int slot);
