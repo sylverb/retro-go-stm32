@@ -387,7 +387,11 @@ void gfx_latch_context(int force)
 {
 	if (!gfx_context.latched || force) { // Context is already saved + we haven't render the line using it
 		gfx_context.scroll_x = IO_VDC_REG[BXR].W;
-		gfx_context.scroll_y = IO_VDC_REG[BYR].W - PCE.ScrollYDiff;
+		/* HuC6270 effective BG Y is BYR-1 relative to this core's line
+		 * counter (see mednafen's historical BG_YMoo = BYR-1). Without it,
+		 * mid-frame BYR splits in Ys I&II leave a 1px black seam on the last
+		 * line of each strip (transparent tile row). */
+		gfx_context.scroll_y = IO_VDC_REG[BYR].W - PCE.ScrollYDiff - 1;
 		gfx_context.control = IO_VDC_REG[CR].W;
 		gfx_context.latched = 1;
 	}
@@ -395,7 +399,7 @@ void gfx_latch_context(int force)
 
 
 /*
-	Render lines into the buffer from min_line to max_line (inclusive)
+	Render lines into the buffer for y in [min_line, max_line).
 */
 static inline void
 render_lines(int min_line, int max_line)
@@ -407,10 +411,10 @@ render_lines(int min_line, int max_line)
 		return;
 	}
 
-	// We must fill the region with color 0 first
-	// memset(screen_buffer + (min_line * XBUF_WIDTH), PCE.Palette[0], XBUF_WIDTH * (max_line - min_line + 1));
+	/* Clear only the lines we draw. Inclusive clear of max_line used to wipe
+	 * the first line of the next raster strip before it was redrawn. */
 	size_t screen_width = gfx_screen_width();
-	for (int y = min_line; y <= max_line; y++) {
+	for (int y = min_line; y < max_line; y++) {
 		memset(screen_buffer + (y * XBUF_WIDTH), PCE.Palette[0], screen_width);
 	}
 
