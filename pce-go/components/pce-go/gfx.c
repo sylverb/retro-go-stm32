@@ -387,11 +387,15 @@ void gfx_latch_context(int force)
 {
 	if (!gfx_context.latched || force) { // Context is already saved + we haven't render the line using it
 		gfx_context.scroll_x = IO_VDC_REG[BXR].W;
-		/* HuC6270 effective BG Y is BYR-1 relative to this core's line
-		 * counter (see mednafen's historical BG_YMoo = BYR-1). Without it,
-		 * mid-frame BYR splits in Ys I&II leave a 1px black seam on the last
-		 * line of each strip (transparent tile row). */
-		gfx_context.scroll_y = IO_VDC_REG[BYR].W - PCE.ScrollYDiff - 1;
+		/* Mid-frame BYR strips (Ys I&II village) need BYR-1 vs this core's
+		 * line counter or the last line of each strip hits a transparent
+		 * tile row. Skip when base scroll is 0: BYR=0 with -1 becomes -1 and
+		 * draw_tiles wraps to the BAT bottom row (dotted first line on Ys III
+		 * black screens after System Card). */
+		int sy = (int)IO_VDC_REG[BYR].W - PCE.ScrollYDiff;
+		if (sy > 0)
+			sy -= 1;
+		gfx_context.scroll_y = sy;
 		gfx_context.control = IO_VDC_REG[CR].W;
 		gfx_context.latched = 1;
 	}
