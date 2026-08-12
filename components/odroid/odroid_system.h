@@ -103,9 +103,6 @@ typedef enum
      ODROID_PATH_COVER_FILE,
      ODROID_PATH_CRC_CACHE,
      ODROID_PATH_CHEAT_STATE,
-     ODROID_PATH_CHEAT_PCE,
-     ODROID_PATH_CHEAT_GAME_GENIE,
-     ODROID_PATH_CHEAT_MCF,
      ODROID_PATH_SYSTEM_CONFIG,
 } emu_path_type_t;
 
@@ -194,6 +191,9 @@ typedef enum
 
 void odroid_system_init(int app_id, int sampleRate);
 char* odroid_system_get_path(emu_path_type_t type, const char *romPath);
+/* Build /cheats/<rom-relative-stem>.<cheat_ext>. cheat_ext has no leading '.'. */
+void odroid_system_get_cheat_path_to_buf(const char *romPath, const char *cheat_ext,
+                                         char *buf, int buf_size);
 void odroid_system_get_save_path(char *path, size_t size, int slot);
 void odroid_system_get_gnw_data_path(char *path, size_t size, int slot);
 void odroid_system_get_sram_path(char *path, size_t size, int slot);
