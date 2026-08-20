@@ -45,6 +45,8 @@ typedef void (*void_callback_t)();
 typedef int (*pause_input_callback_t)(odroid_gamepad_state_t* joystick);
 
 #define ODROID_DIALOG_CHOICE_LAST {0x0F0F0F0F, "LAST", (char *)"LAST", 0xFFFF, NULL}
+#define ODROID_DIALOG_CHOICE_SEPARATOR {0x0F0F0F0E, "-", "-", -1, NULL}
+
 
 extern odroid_menu_state_t odroid_menu_state;
 
